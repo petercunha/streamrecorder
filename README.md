@@ -13,21 +13,21 @@ A lightweight, CPU and memory efficient Twitch HLS recorder written in Rust. Ins
 
 ```bash
 # Clone the repo
-git clone https://github.com/petercunha/streamlink_rs.git
-cd streamlink_rs
+git clone https://github.com/petercunha/streamrecorder.git
+cd streamrecorder
 
 # Build in release mode
 cargo build --release
 
 # Install (optional)
-cp target/release/streamlink_rs /usr/local/bin/
+cp target/release/streamlink-rs /usr/local/bin/
 ```
 
 ## Usage
 
 ```bash
 # Record the best quality from a live channel
-streamlink_rs https://www.twitch.tv/some_channel best --record output.ts
+streamlink-rs https://www.twitch.tv/some_channel best --record output.ts
 ```
 
 ## License
