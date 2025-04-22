@@ -1,21 +1,14 @@
-// Cargo.toml
-// -----------------
-// [package]
-// name = "streamlink_rs"
-// version = "0.1.0"
-// edition = "2021"
-//
-// [dependencies]
-// clap = { version = "4.0", features = ["derive"] }
-// tokio = { version = "1.26", features = ["full"] }
-// reqwest = { version = "0.11", features = ["json","stream"] }
-// serde = { version = "1.0", features = ["derive"] }
-// serde_json = "1.0"
-// anyhow = "1.0"
-// urlencoding = "2.1"
-// rand = "0.8"
-//
-// src/main.rs
+// Project: streamlink-rs
+// Created Date: 2025-04-21
+// Author: Peter Cunha
+// Email: petercunha8@gmail.com
+// Description: A simple Twitch HLS recorder in Rust. Light and efficient on CPU and memory.
+// License: MIT
+
+// Usage: 
+//      cargo run --release -- <twitch_channel_url> <quality> --record <output_file>
+// 
+//      streamlink-rs https://www.twitch.tv/forsen best --record output.ts
 
 use clap::Parser;
 use reqwest::Client;
