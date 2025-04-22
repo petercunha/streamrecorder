@@ -20,14 +20,14 @@ cd streamrecorder
 cargo build --release
 
 # Install (optional)
-cp target/release/streamlink-rs /usr/local/bin/
+cp target/release/streamlink_rs /usr/local/bin/
 ```
 
 ## Usage
 
 ```bash
 # Record the best quality from a live channel
-streamlink-rs https://www.twitch.tv/some_channel best --record output.ts
+streamlink_rs https://www.twitch.tv/some_channel best --record output.ts
 ```
 
 ## License
