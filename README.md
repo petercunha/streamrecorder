@@ -8,7 +8,6 @@ A lightweight, CPU and memory efficient Twitch HLS recorder written in Rust. Ins
 - Builds and parses the HLS master playlist
 - Selects either the highest‑bandwidth (`best`) or a specific quality (e.g. `720p60`)
 - Continuously polls for new segments and appends to an output file
-- Zero‑dependency parsing (line‑based) for maximum performance
 
 ## Installation
 
