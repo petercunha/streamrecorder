@@ -1,4 +1,4 @@
-# streamlink_rs
+# streamlink-rs
 
 A lightweight, CPU and memory efficient Twitch HLS recorder written in Rust. Inspired by [Streamlink](https://github.com/streamlink/streamlink), `streamlink_rs` fetches a live Twitch HLS stream and writes the raw MPEG‑TS segments into a file.
 
