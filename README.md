@@ -19,15 +19,24 @@ cd streamrecorder
 # Build in release mode
 cargo build --release
 
-# Install (optional)
-cp target/release/streamlink_rs /usr/local/bin/
+# Run
+./target/release/streamrecorder
 ```
 
 ## Usage
 
 ```bash
-# Record the best quality from a live channel
-streamlink_rs https://www.twitch.tv/some_channel best --record output.ts
+streamrecorder [OPTIONS] <URL>
+
+Arguments:
+  <URL>  Twitch channel URL (e.g. https://www.twitch.tv/forsen)
+
+Options:
+  -q, --quality <QUALITY>  Desired stream quality ("best" or a quality preset, e.g. "720p60") [default: best]
+  -o, --output <OUTPUT>    Output filename (will append .ts if missing)
+  -v, --verbose...         Verbose mode (-v, -vv …)
+  -h, --help               Print help
+  -V, --version            Print version
 ```
 
 ## License

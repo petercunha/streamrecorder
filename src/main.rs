@@ -19,7 +19,7 @@ struct Args {
     /// Twitch channel URL (e.g. https://www.twitch.tv/forsen)
     url: String,
 
-    /// Desired stream quality ("best" or a bandwidth number, e.g. "3000000")
+    /// Desired stream quality ("best" or a quality preset, e.g. "720p60")
     #[arg(short, long, default_value = "best")]
     quality: String,
 
