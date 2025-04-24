@@ -1,4 +1,4 @@
-// Project: streamlink-rs
+// Project: streamrecorder
 // Created Date: 2025-04-21
 // Author: Peter Cunha
 // Email: petercunha8@gmail.com
@@ -6,9 +6,9 @@
 // License: MIT
 
 // Usage: 
-//      cargo run --release -- <twitch_channel_url> <quality> --record <output_file>
+//      cargo run -- https://www.twitch.tv/<streamer> best --record lexi.ts
 // 
-//      streamlink-rs https://www.twitch.tv/forsen best --record output.ts
+//      streamrecorder https://www.twitch.tv/forsen best --record output.ts
 
 use clap::Parser;
 use reqwest::Client;
@@ -71,7 +71,6 @@ async fn fetch_token(client: &Client, channel: &str) -> anyhow::Result<AccessTok
         .text()
         .await
         .context("failed to read GraphQL response")?;
-    eprintln!("Twitch token response: {}", resp_text);
 
     let resp: GqlResponse = serde_json::from_str(&resp_text)
         .context("failed to parse GraphQL response as GqlResponse")?;
@@ -163,7 +162,7 @@ impl Recorder {
 async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     let channel = args.url.trim_end_matches('/').split('/').last().unwrap().to_string();
-    let client = Client::builder().user_agent("streamlink-rs/0.1").build()?;
+    let client = Client::builder().user_agent("streamrecorder/0.1").build()?;
     let token = fetch_token(&client, &channel).await?;
     let master_url = build_playlist_url(&channel, &token);
     let variants = fetch_variants(&client, &master_url).await?;

@@ -1,5 +1,5 @@
 [package]
-name = "streamlink_rs"
+name = "streamrecorder"
 version = "0.1.0"
 edition = "2021"
 
