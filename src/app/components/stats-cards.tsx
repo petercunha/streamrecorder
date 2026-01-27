@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { HardDrive, Radio, Users, Disc, Activity } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -27,6 +28,7 @@ interface StatCardProps {
   trend?: "up" | "down" | "neutral";
   color?: "purple" | "green" | "blue" | "orange" | "red";
   animate?: boolean;
+  href?: string;
 }
 
 function StatCard({
@@ -37,6 +39,7 @@ function StatCard({
   trend = "neutral",
   color = "purple",
   animate = false,
+  href,
 }: StatCardProps) {
   const colorClasses = {
     purple: "from-purple-500/20 to-purple-600/10 text-purple-400",
@@ -46,8 +49,13 @@ function StatCard({
     red: "from-red-500/20 to-red-600/10 text-red-400",
   };
 
-  return (
-    <Card className="relative overflow-hidden group hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+  const cardContent = (
+    <Card
+      className={cn(
+        "relative overflow-hidden group hover:shadow-lg transition-all duration-300 hover:-translate-y-1 h-full",
+        href ? "cursor-pointer hover:ring-2 hover:ring-primary/20" : ""
+      )}
+    >
       <div
         className={cn(
           "absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity duration-300",
@@ -78,6 +86,16 @@ function StatCard({
       </CardContent>
     </Card>
   );
+
+  if (href) {
+    return (
+      <Link href={href} className="block">
+        {cardContent}
+      </Link>
+    );
+  }
+
+  return cardContent;
 }
 
 export function StatsCards() {
@@ -128,6 +146,7 @@ export function StatsCards() {
         description="All-time data downloaded"
         icon={HardDrive}
         color="purple"
+        href="/recordings"
       />
       <StatCard
         title="Active Recordings"
@@ -136,6 +155,7 @@ export function StatsCards() {
         icon={Radio}
         color="green"
         animate={stats.activeRecordings > 0}
+        href="/monitor"
       />
       <StatCard
         title="Total Streamers"
@@ -143,6 +163,7 @@ export function StatsCards() {
         description="Streamers being monitored"
         icon={Users}
         color="blue"
+        href="/streamers"
       />
       <StatCard
         title="Total Recordings"
@@ -150,6 +171,7 @@ export function StatsCards() {
         description={`${stats.recordingStats.completed} completed`}
         icon={Disc}
         color="orange"
+        href="/recordings"
       />
     </div>
   );

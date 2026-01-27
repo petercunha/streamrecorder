@@ -113,8 +113,9 @@ export function RecentRecordings({ limit = 10 }: RecentRecordingsProps) {
           <ScrollArea className="h-[300px]">
             <div className="space-y-2">
               {recordings.map((recording) => (
-                <div
+                <Link
                   key={recording.id}
+                  href={`/recordings/${recording.id}`}
                   className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
                 >
                   <div className="flex items-center gap-3">
@@ -144,13 +145,13 @@ export function RecentRecordings({ limit = 10 }: RecentRecordingsProps) {
                     >
                       {recording.status}
                     </Badge>
-                    <Link href={`/recordings/${recording.id}`}>
-                      <Button variant="ghost" size="icon">
+                    <Button variant="ghost" size="icon" asChild>
+                      <span>
                         <ExternalLink className="w-4 h-4" />
-                      </Button>
-                    </Link>
+                      </span>
+                    </Button>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           </ScrollArea>

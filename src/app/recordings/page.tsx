@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Sidebar } from "../components/sidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,7 +26,6 @@ import {
   Search,
   Video,
   Play,
-  ExternalLink,
   Trash2,
   Filter,
 } from "lucide-react";
@@ -47,6 +46,7 @@ interface Recording {
 }
 
 export default function RecordingsPage() {
+  const router = useRouter();
   const [recordings, setRecordings] = useState<Recording[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -200,7 +200,11 @@ export default function RecordingsPage() {
                     </TableRow>
                   ) : (
                     filteredRecordings.map((recording) => (
-                      <TableRow key={recording.id}>
+                      <TableRow 
+                        key={recording.id}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => router.push(`/recordings/${recording.id}`)}
+                      >
                         <TableCell>
                           <div>
                             <p className="font-medium">
@@ -239,17 +243,13 @@ export default function RecordingsPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
-                            <Button variant="ghost" size="icon" asChild>
-                              <Link href={`/recordings/${recording.id}`}>
-                                <ExternalLink className="w-4 h-4" />
-                              </Link>
-                            </Button>
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() =>
-                                handleDelete(recording.id, recording.streamer_username)
-                              }
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(recording.id, recording.streamer_username);
+                              }}
                               className="text-destructive"
                             >
                               <Trash2 className="w-4 h-4" />

@@ -184,7 +184,7 @@ export function StreamersList({ limit }: StreamersListProps) {
                           {initials}
                         </AvatarFallback>
                       </Avatar>
-                      <div>
+                      <Link href={`/streamers/${streamer.id}/edit`} className="hover:underline">
                         <p className="font-medium text-foreground">
                           {streamer.display_name || streamer.username}
                         </p>
@@ -197,7 +197,7 @@ export function StreamersList({ limit }: StreamersListProps) {
                             {streamer.quality_preference}
                           </Badge>
                         </div>
-                      </div>
+                      </Link>
                     </div>
 
                     <div className="flex items-center gap-2">

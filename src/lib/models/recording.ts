@@ -198,7 +198,7 @@ export const RecordingModel = {
   // Get total downloaded bytes
   getTotalDownloaded(): number {
     const stmt = db.prepare(`
-      SELECT SUM(file_size_bytes) as total FROM recordings WHERE status = 'completed'
+      SELECT SUM(file_size_bytes) as total FROM recordings
     `);
     const result = stmt.get() as { total: number | null };
     return result.total || 0;
