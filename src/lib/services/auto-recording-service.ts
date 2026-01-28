@@ -74,6 +74,7 @@ class AutoRecordingService {
   // Perform a check
   private async check(): Promise<void> {
     try {
+      // The check now has built-in locking to prevent concurrent execution
       await recordingService.checkAndRecordStreamers();
     } catch (error) {
       console.error('Error during auto-recording check:', error);

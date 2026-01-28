@@ -1,7 +1,7 @@
 import { spawn, ChildProcess } from 'child_process';
 import path from 'path';
 import fs from 'fs';
-import { RecordingModel, RecordingLogModel, StreamerModel } from '../models';
+import { RecordingModel, RecordingLogModel, StreamerModel, StatsModel } from '../models';
 import { EventEmitter } from 'events';
 
 const RECORDINGS_DIR = process.env.RECORDINGS_DIR || path.join(process.cwd(), 'recordings');
@@ -19,6 +19,7 @@ class RecordingService extends EventEmitter {
   private activeRecordings: Map<number, ActiveRecording> = new Map();
   private checkInterval: NodeJS.Timeout | null = null;
   private isShuttingDown = false;
+  private checkInProgress = false;
 
   constructor() {
     super();
@@ -41,36 +42,72 @@ class RecordingService extends EventEmitter {
     this.stopAutoChecker();
     
     // Stop all active recordings
-    const activeRecordings = this.getActiveRecordings();
+    const activeRecordings = Array.from(this.activeRecordings.values());
     if (activeRecordings.length > 0) {
       console.log(`Stopping ${activeRecordings.length} active recording(s)...`);
       
+      // First, update all active recordings in DB to stopped status
+      // This ensures DB is consistent even if process exits before handlers run
+      const endTime = new Date();
+      for (const recording of activeRecordings) {
+        const durationSeconds = Math.floor((endTime.getTime() - recording.startTime.getTime()) / 1000);
+        
+        // Get file size if available
+        let fileSizeBytes = 0;
+        try {
+          const stats = fs.statSync(recording.filePath);
+          fileSizeBytes = stats.size;
+        } catch {
+          // File might not exist if recording failed
+        }
+        
+        // Update recording status in DB immediately
+        RecordingModel.update(recording.recordingId, {
+          status: 'stopped',
+          ended_at: endTime.toISOString(),
+          duration_seconds: durationSeconds,
+          file_size_bytes: fileSizeBytes,
+        });
+        
+        RecordingLogModel.create({
+          recording_id: recording.recordingId,
+          streamer_username: recording.username,
+          message: `Recording stopped due to server shutdown. Duration: ${durationSeconds}s`,
+          level: 'warn',
+        });
+        
+        console.log(`Updated recording ${recording.recordingId} for ${recording.username} to stopped status`);
+      }
+      
+      // Update stats
+      StatsModel.update({ active_recordings: 0 });
+      
+      // Now kill the processes
       const stopPromises = activeRecordings.map(recording => {
         return new Promise<void>((resolve) => {
-          const activeRecording = this.activeRecordings.get(recording.streamerId);
-          if (activeRecording) {
-            // Force kill after 5 seconds if not stopped
-            const timeout = setTimeout(() => {
-              if (!activeRecording.process.killed) {
-                activeRecording.process.kill('SIGKILL');
-              }
-              resolve();
-            }, 5000);
-            
-            activeRecording.process.on('close', () => {
-              clearTimeout(timeout);
-              resolve();
-            });
-            
-            activeRecording.process.kill('SIGTERM');
-          } else {
+          // Force kill after 2 seconds if not stopped
+          const timeout = setTimeout(() => {
+            if (!recording.process.killed) {
+              recording.process.kill('SIGKILL');
+            }
             resolve();
-          }
+          }, 2000);
+          
+          recording.process.on('close', () => {
+            clearTimeout(timeout);
+            resolve();
+          });
+          
+          recording.process.kill('SIGTERM');
         });
       });
       
       await Promise.all(stopPromises);
-      console.log('All recordings stopped');
+      
+      // Clear the active recordings map since we've updated the DB
+      this.activeRecordings.clear();
+      
+      console.log('All recordings stopped and database updated');
     }
     
     console.log('Recording service shutdown complete');
@@ -100,26 +137,54 @@ class RecordingService extends EventEmitter {
 
   // Check all active streamers and start recording if live
   async checkAndRecordStreamers(): Promise<void> {
-    const streamers = StreamerModel.findAll();
+    // Prevent concurrent checks
+    if (this.checkInProgress) {
+      console.log('Check already in progress, skipping...');
+      return;
+    }
     
-    for (const streamer of streamers) {
-      if (!streamer.auto_record) continue;
+    this.checkInProgress = true;
+    
+    try {
+      const streamers = StreamerModel.findAll();
       
-      // Skip if already recording
-      if (this.isRecording(streamer.id)) {
-        continue;
-      }
+      for (const streamer of streamers) {
+        if (!streamer.auto_record) continue;
+        
+        // Double-check if already recording (in-memory check)
+        if (this.isRecording(streamer.id)) {
+          console.log(`Already recording ${streamer.username}, skipping...`);
+          continue;
+        }
+        
+        // Also check database for any active recordings
+        const existingRecording = RecordingModel.findActiveByStreamer(streamer.id);
+        if (existingRecording) {
+          console.log(`Found existing active recording for ${streamer.username} in DB, skipping...`);
+          continue;
+        }
 
-      // Check if streamer is live
-      const isLive = await this.checkIfLive(streamer.username);
-      
-      if (isLive) {
-        try {
-          await this.startRecording(streamer.id);
-        } catch (error) {
-          console.error(`Failed to start recording for ${streamer.username}:`, error);
+        // Check if streamer is live
+        const isLive = await this.checkIfLive(streamer.username);
+        
+        if (isLive) {
+          // Final check before starting to prevent race conditions
+          if (this.isRecording(streamer.id)) {
+            console.log(`Recording for ${streamer.username} started by another check, skipping...`);
+            continue;
+          }
+          
+          try {
+            console.log(`Starting recording for ${streamer.username}...`);
+            await this.startRecording(streamer.id);
+            console.log(`Successfully started recording for ${streamer.username}`);
+          } catch (error) {
+            console.error(`Failed to start recording for ${streamer.username}:`, error);
+          }
         }
       }
+    } finally {
+      this.checkInProgress = false;
     }
   }
 
@@ -254,6 +319,9 @@ class RecordingService extends EventEmitter {
     };
 
     this.activeRecordings.set(streamerId, activeRecording);
+    
+    // Update stats in database to reflect the actual in-memory active recordings count
+    StatsModel.update({ active_recordings: this.activeRecordings.size });
 
     // Handle process events
     streamlink.on('close', (code) => {
@@ -334,6 +402,9 @@ class RecordingService extends EventEmitter {
     if (!recording) return;
 
     this.activeRecordings.delete(streamerId);
+    
+    // Update stats in database to reflect the actual in-memory active recordings count
+    StatsModel.update({ active_recordings: this.activeRecordings.size });
 
     const endTime = new Date();
     const durationSeconds = Math.floor((endTime.getTime() - recording.startTime.getTime()) / 1000);

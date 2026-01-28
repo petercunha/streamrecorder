@@ -14,16 +14,8 @@ export function initServer(): void {
   console.log('Initializing server...');
   
   // Start the auto-recording background service
+  // This performs an initial check immediately and then periodic checks
   autoRecordingService.start();
-  
-  // Trigger an immediate check for live streamers on server start
-  // This ensures we don't miss any streams that are already live
-  setTimeout(() => {
-    console.log('Performing initial live check on server start...');
-    recordingService.checkAndRecordStreamers().catch((error) => {
-      console.error('Error during initial live check:', error);
-    });
-  }, 1000);
   
   // Setup graceful shutdown handlers
   setupGracefulShutdown();
