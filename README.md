@@ -59,7 +59,7 @@ pip install streamlink
 
 1. Clone or download this repository:
 ```bash
-cd twitch-recorder
+cd streamrecorder
 ```
 
 2. Install dependencies:
@@ -67,12 +67,20 @@ cd twitch-recorder
 npm install
 ```
 
-3. Build the CLI:
+3. Run web portal
+```bash
+npm run dev
+```
+Then go to http://localhost:3000 in your browser!
+
+---
+
+4. (Optional) Build the CLI:
 ```bash
 npm run cli:build
 ```
 
-4. (Optional) Link the CLI globally:
+5. (Optional) Link the CLI globally:
 ```bash
 npm link
 ```
