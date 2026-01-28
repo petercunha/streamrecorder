@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Sidebar } from "../components/sidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -22,10 +23,49 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Settings, FolderOpen, Database, Globe, Save, ExternalLink } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { 
+  Settings, 
+  FolderOpen, 
+  Database, 
+  Globe, 
+  Save, 
+  ExternalLink,
+  Activity,
+  RefreshCw,
+  Play,
+  Square,
+  Radio,
+  Users,
+  Video,
+  Loader2,
+} from "lucide-react";
 import { toast } from "sonner";
 
+interface ServiceStatus {
+  autoRecording: {
+    isRunning: boolean;
+    checkIntervalMs: number;
+  };
+  stats: {
+    totalStreamers: number;
+    autoRecordEnabled: number;
+    activeRecordings: number;
+  };
+  recordings: Array<{
+    recordingId: number;
+    streamerId: number;
+    username: string;
+    startTime: string;
+    filePath: string;
+  }>;
+}
+
 export default function SettingsPage() {
+  const [serviceStatus, setServiceStatus] = useState<ServiceStatus | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [checking, setChecking] = useState(false);
+
   const [settings, setSettings] = useState({
     // Recording Settings
     outputDirectory: "./recordings",
@@ -44,9 +84,63 @@ export default function SettingsPage() {
     notificationsEnabled: false,
   });
 
+  useEffect(() => {
+    fetchServiceStatus();
+    // Refresh status every 5 seconds
+    const interval = setInterval(fetchServiceStatus, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const fetchServiceStatus = async () => {
+    try {
+      const response = await fetch("/api/service/status");
+      if (response.ok) {
+        const data = await response.json();
+        setServiceStatus(data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch service status:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleManualCheck = async () => {
+    setChecking(true);
+    try {
+      const response = await fetch("/api/service/check", {
+        method: "POST",
+      });
+      if (response.ok) {
+        toast.success("Manual check triggered - checking for live streamers...");
+        // Refresh status after a short delay
+        setTimeout(fetchServiceStatus, 2000);
+      } else {
+        toast.error("Failed to trigger manual check");
+      }
+    } catch (error) {
+      toast.error("Failed to trigger manual check");
+    } finally {
+      setTimeout(() => setChecking(false), 1000);
+    }
+  };
+
   const handleSave = () => {
     // In a real implementation, these would be saved to a config file or database
     toast.success("Settings saved successfully");
+  };
+
+  const formatDuration = (startTime: string) => {
+    const start = new Date(startTime);
+    const now = new Date();
+    const diffMs = now.getTime() - start.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    
+    if (diffHours > 0) {
+      return `${diffHours}h ${diffMins % 60}m`;
+    }
+    return `${diffMins}m`;
   };
 
   return (
@@ -69,6 +163,103 @@ export default function SettingsPage() {
           </div>
 
           <div className="space-y-6 max-w-3xl">
+            {/* Service Status Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Activity className="w-5 h-5" />
+                  Service Status
+                </CardTitle>
+                <CardDescription>
+                  Monitor and control the auto-recording background service
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Status Badge */}
+                <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-3 h-3 rounded-full ${serviceStatus?.autoRecording.isRunning ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+                    <div>
+                      <p className="font-medium">
+                        Auto-Recording Service
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {serviceStatus?.autoRecording.isRunning 
+                          ? `Running (checks every ${serviceStatus.autoRecording.checkIntervalMs / 1000}s)` 
+                          : 'Stopped'}
+                      </p>
+                    </div>
+                  </div>
+                  <Badge variant={serviceStatus?.autoRecording.isRunning ? "default" : "destructive"}>
+                    {serviceStatus?.autoRecording.isRunning ? "Active" : "Inactive"}
+                  </Badge>
+                </div>
+
+                {/* Stats Grid */}
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="p-4 border rounded-lg text-center">
+                    <Users className="w-5 h-5 mx-auto mb-2 text-muted-foreground" />
+                    <p className="text-2xl font-bold">{serviceStatus?.stats.totalStreamers || 0}</p>
+                    <p className="text-xs text-muted-foreground">Total Streamers</p>
+                  </div>
+                  <div className="p-4 border rounded-lg text-center">
+                    <Radio className="w-5 h-5 mx-auto mb-2 text-green-500" />
+                    <p className="text-2xl font-bold">{serviceStatus?.stats.autoRecordEnabled || 0}</p>
+                    <p className="text-xs text-muted-foreground">Auto-Record</p>
+                  </div>
+                  <div className="p-4 border rounded-lg text-center">
+                    <Video className="w-5 h-5 mx-auto mb-2 text-red-500" />
+                    <p className="text-2xl font-bold">{serviceStatus?.stats.activeRecordings || 0}</p>
+                    <p className="text-xs text-muted-foreground">Recording Now</p>
+                  </div>
+                </div>
+
+                {/* Manual Check Button */}
+                <Button 
+                  onClick={handleManualCheck} 
+                  disabled={checking}
+                  className="w-full"
+                >
+                  {checking ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Checking...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Check for Live Streamers Now
+                    </>
+                  )}
+                </Button>
+
+                {/* Active Recordings */}
+                {serviceStatus && serviceStatus.recordings.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Active Recordings</Label>
+                    <ScrollArea className="h-[150px] border rounded-lg p-2">
+                      <div className="space-y-2">
+                        {serviceStatus.recordings.map((recording) => (
+                          <div 
+                            key={recording.recordingId}
+                            className="flex items-center justify-between p-2 bg-muted/50 rounded"
+                          >
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                              <span className="font-medium">{recording.username}</span>
+                            </div>
+                            <span className="text-sm text-muted-foreground">
+                              {formatDuration(recording.startTime)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             {/* Recording Settings */}
             <Card>
               <CardHeader>

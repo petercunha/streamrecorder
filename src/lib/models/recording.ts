@@ -37,6 +37,7 @@ export interface UpdateRecordingInput {
 export interface RecordingWithStreamer extends Recording {
   streamer_username: string;
   streamer_display_name: string;
+  streamer_avatar_url: string | null;
 }
 
 export const RecordingModel = {
@@ -68,7 +69,7 @@ export const RecordingModel = {
     offset?: number;
   }): RecordingWithStreamer[] {
     let query = `
-      SELECT r.*, s.username as streamer_username, s.display_name as streamer_display_name
+      SELECT r.*, s.username as streamer_username, s.display_name as streamer_display_name, s.avatar_url as streamer_avatar_url
       FROM recordings r
       JOIN streamers s ON r.streamer_id = s.id
       WHERE 1=1
@@ -110,7 +111,7 @@ export const RecordingModel = {
   // Find recording by ID
   findById(id: number): RecordingWithStreamer | undefined {
     const stmt = db.prepare(`
-      SELECT r.*, s.username as streamer_username, s.display_name as streamer_display_name
+      SELECT r.*, s.username as streamer_username, s.display_name as streamer_display_name, s.avatar_url as streamer_avatar_url
       FROM recordings r
       JOIN streamers s ON r.streamer_id = s.id
       WHERE r.id = ?

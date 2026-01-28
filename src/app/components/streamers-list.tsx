@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,6 +28,7 @@ interface Streamer {
   id: number;
   username: string;
   display_name: string | null;
+  avatar_url: string | null;
   is_active: boolean;
   auto_record: boolean;
   quality_preference: string;
@@ -180,6 +181,11 @@ export function StreamersList({ limit }: StreamersListProps) {
                   >
                     <div className="flex items-center gap-3">
                       <Avatar className="w-10 h-10">
+                        <AvatarImage 
+                          src={streamer.avatar_url || undefined} 
+                          alt={streamer.username}
+                          className="object-cover"
+                        />
                         <AvatarFallback className="bg-primary/20 text-primary">
                           {initials}
                         </AvatarFallback>

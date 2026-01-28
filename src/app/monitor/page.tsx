@@ -7,12 +7,14 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
 import { Radio, Users, Video, Activity, Loader2 } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface Recording {
   id: number;
   streamer_id: number;
   streamer_username: string;
   streamer_display_name: string;
+  streamer_avatar_url: string | null;
   stream_title: string | null;
   stream_category: string | null;
   file_size_bytes: number;
@@ -217,6 +219,16 @@ export default function MonitorPage() {
                             <div className="flex items-start justify-between">
                               <div className="flex-1">
                                 <div className="flex items-center gap-3 mb-2">
+                                  <Avatar className="w-8 h-8">
+                                    <AvatarImage 
+                                      src={recording.streamer_avatar_url || undefined} 
+                                      alt={recording.streamer_username}
+                                      className="object-cover"
+                                    />
+                                    <AvatarFallback className="bg-primary/20 text-primary text-sm">
+                                      {recording.streamer_username.slice(0, 2).toUpperCase()}
+                                    </AvatarFallback>
+                                  </Avatar>
                                   <h3 className="font-semibold text-lg">
                                     {recording.streamer_display_name || recording.streamer_username}
                                   </h3>

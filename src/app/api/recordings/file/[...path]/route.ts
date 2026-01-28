@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readFile } from "fs/promises";
+import { createReadStream, statSync } from "fs";
 import { existsSync } from "fs";
 import path from "path";
 
@@ -30,7 +30,8 @@ export async function GET(
       );
     }
     
-    const fileBuffer = await readFile(filePath);
+    const stats = statSync(filePath);
+    const fileSize = stats.size;
     
     // Determine content type based on file extension
     const ext = path.extname(filePath).toLowerCase();
@@ -56,13 +57,57 @@ export async function GET(
         contentType = "video/quicktime";
         break;
     }
+
+    // Handle range requests for video streaming
+    const range = request.headers.get("range");
     
-    return new NextResponse(fileBuffer, {
-      headers: {
-        "Content-Type": contentType,
-        "Content-Disposition": `inline; filename="${path.basename(filePath)}"`,
-      },
-    });
+    if (range) {
+      // Parse range header
+      const parts = range.replace(/bytes=/, "").split("-");
+      const start = parseInt(parts[0], 10);
+      const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+      const chunkSize = end - start + 1;
+      
+      // Create read stream for the range
+      const readStream = createReadStream(filePath, { start, end });
+      
+      // Convert stream to buffer
+      const chunks: Buffer[] = [];
+      for await (const chunk of readStream) {
+        chunks.push(chunk);
+      }
+      const buffer = Buffer.concat(chunks);
+      
+      return new NextResponse(buffer, {
+        status: 206, // Partial Content
+        headers: {
+          "Content-Type": contentType,
+          "Content-Length": chunkSize.toString(),
+          "Content-Range": `bytes ${start}-${end}/${fileSize}`,
+          "Accept-Ranges": "bytes",
+        },
+      });
+    } else {
+      // No range requested, return entire file
+      // For large files, we still want to stream them
+      const readStream = createReadStream(filePath);
+      
+      // Convert stream to buffer (for NextResponse compatibility)
+      const chunks: Buffer[] = [];
+      for await (const chunk of readStream) {
+        chunks.push(chunk);
+      }
+      const buffer = Buffer.concat(chunks);
+      
+      return new NextResponse(buffer, {
+        headers: {
+          "Content-Type": contentType,
+          "Content-Length": fileSize.toString(),
+          "Accept-Ranges": "bytes",
+          "Content-Disposition": `inline; filename="${path.basename(filePath)}"`,
+        },
+      });
+    }
   } catch (error) {
     console.error("Failed to serve file:", error);
     return NextResponse.json(

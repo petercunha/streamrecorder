@@ -25,6 +25,7 @@ import {
   Maximize,
   Download,
 } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
 
 interface Recording {
@@ -32,6 +33,7 @@ interface Recording {
   streamer_id: number;
   streamer_username: string;
   streamer_display_name: string;
+  streamer_avatar_url: string | null;
   stream_title: string | null;
   stream_category: string | null;
   file_path: string;
@@ -432,11 +434,16 @@ export default function RecordingDetailPage() {
                     href={`/streamers/${recording.streamer_id}/edit`}
                     className="flex items-center gap-3 hover:bg-muted p-2 rounded-lg transition-colors -ml-2"
                   >
-                    <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
-                      <span className="text-lg font-bold text-primary">
+                    <Avatar className="w-12 h-12">
+                      <AvatarImage 
+                        src={recording.streamer_avatar_url || undefined} 
+                        alt={recording.streamer_username}
+                        className="object-cover"
+                      />
+                      <AvatarFallback className="bg-primary/20 text-primary text-lg">
                         {recording.streamer_username.slice(0, 2).toUpperCase()}
-                      </span>
-                    </div>
+                      </AvatarFallback>
+                    </Avatar>
                     <div>
                       <p className="font-semibold">
                         {recording.streamer_display_name || recording.streamer_username}

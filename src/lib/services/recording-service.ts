@@ -135,8 +135,8 @@ class RecordingService extends EventEmitter {
       streamlink.on('close', (code) => {
         try {
           const result = JSON.parse(output);
-          // Stream is live if there's no error and type is set (usually 'hls')
-          resolve(!result.error && !!result.type);
+          // Stream is live if there's no error and we have stream info (type or url indicates stream is available)
+          resolve(!result.error && (!!result.type || !!result.url));
         } catch {
           resolve(false);
         }
@@ -173,11 +173,13 @@ class RecordingService extends EventEmitter {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const filename = `${streamer.username}_${timestamp}.mp4`;
     const filePath = path.join(RECORDINGS_DIR, filename);
+    // Store relative path for web access
+    const relativeFilePath = `recordings/${filename}`;
 
-    // Create recording record with metadata
+    // Create recording record with metadata (use relative path for web access)
     const recording = RecordingModel.create({
       streamer_id: streamerId,
-      file_path: filePath,
+      file_path: relativeFilePath,
       quality: streamer.quality_preference,
       stream_title: metadata?.title,
       stream_category: metadata?.category,
