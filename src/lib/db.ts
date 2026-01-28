@@ -16,8 +16,14 @@ const db: DatabaseType = new Database(DB_PATH);
 // Enable WAL mode for better performance
 db.pragma('journal_mode = WAL');
 
+let isInitialized = false;
+
 // Initialize tables
 export function initDatabase() {
+  if (isInitialized) {
+    return;
+  }
+
   // Streamers table
   db.exec(`
     CREATE TABLE IF NOT EXISTS streamers (
@@ -105,6 +111,7 @@ export function initDatabase() {
     INSERT OR IGNORE INTO service_state (id, is_running) VALUES (1, 0)
   `);
 
+  isInitialized = true;
   console.log('Database initialized at:', DB_PATH);
 }
 
