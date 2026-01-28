@@ -24,6 +24,7 @@ import {
   VolumeX,
   Maximize,
   Download,
+  Square,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
@@ -110,6 +111,26 @@ export default function RecordingDetailPage() {
       }
     } catch (error) {
       toast.error("Failed to delete recording");
+    }
+  };
+
+  const handleStopRecording = async () => {
+    if (!recording) return;
+    if (!confirm("Are you sure you want to stop this recording?")) return;
+
+    try {
+      const response = await fetch(`/api/recordings/stop/${recording.streamer_id}`, {
+        method: "POST",
+      });
+
+      if (response.ok) {
+        toast.success("Recording stopped");
+        fetchRecording();
+      } else {
+        toast.error("Failed to stop recording");
+      }
+    } catch (error) {
+      toast.error("Failed to stop recording");
     }
   };
 
@@ -231,7 +252,17 @@ export default function RecordingDetailPage() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={handleDelete} className="text-destructive">
+              {recording.status === "recording" && (
+                <Button 
+                  variant="outline" 
+                  onClick={handleStopRecording}
+                  className="text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50 dark:hover:bg-yellow-950/30 cursor-pointer"
+                >
+                  <Square className="w-4 h-4 mr-2" />
+                  Stop Recording
+                </Button>
+              )}
+              <Button variant="outline" onClick={handleDelete} className="text-destructive cursor-pointer">
                 <Trash2 className="w-4 h-4 mr-2" />
                 Delete
               </Button>

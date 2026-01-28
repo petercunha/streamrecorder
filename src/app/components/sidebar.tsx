@@ -78,7 +78,7 @@ export function Sidebar() {
           variant="ghost"
           size="icon"
           onClick={() => setCollapsed(!collapsed)}
-          className={cn("shrink-0", collapsed && "mx-auto")}
+          className={cn("shrink-0 cursor-pointer", collapsed && "mx-auto")}
         >
           {collapsed ? (
             <Menu className="w-5 h-5" />

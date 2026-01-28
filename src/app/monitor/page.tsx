@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Sidebar } from "../components/sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +32,7 @@ interface Stats {
 }
 
 export default function MonitorPage() {
+  const router = useRouter();
   const [activeRecordings, setActiveRecordings] = useState<Recording[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -214,7 +216,11 @@ export default function MonitorPage() {
                     {activeRecordings.map((recording) => {
                       const duration = calculateDuration(recording.started_at);
                       return (
-                        <Card key={recording.id} className="border-l-4 border-l-red-500">
+                        <Card 
+                          key={recording.id} 
+                          className="border-l-4 border-l-red-500 cursor-pointer hover:shadow-md hover:border-l-red-600 transition-all"
+                          onClick={() => router.push(`/recordings/${recording.id}`)}
+                        >
                           <CardContent className="p-4">
                             <div className="flex items-start justify-between">
                               <div className="flex-1">

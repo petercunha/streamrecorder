@@ -1,19 +1,53 @@
 import recordingService from './recording-service';
+import db from '@/lib/db';
+
+// Service state management using database for persistence
+function getServiceState(): { isRunning: boolean; startedAt: Date | null } {
+  try {
+    const row = db.prepare('SELECT is_running, started_at FROM service_state WHERE id = 1').get() as { is_running: number; started_at: string | null } | undefined;
+    return {
+      isRunning: row?.is_running === 1,
+      startedAt: row?.started_at ? new Date(row.started_at) : null,
+    };
+  } catch (error) {
+    console.error('Failed to get service state:', error);
+    return { isRunning: false, startedAt: null };
+  }
+}
+
+function setServiceState(isRunning: boolean): void {
+  try {
+    if (isRunning) {
+      db.prepare(
+        'UPDATE service_state SET is_running = 1, started_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = 1'
+      ).run();
+    } else {
+      db.prepare(
+        'UPDATE service_state SET is_running = 0, started_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = 1'
+      ).run();
+    }
+  } catch (error) {
+    console.error('Failed to set service state:', error);
+  }
+}
 
 // Singleton to manage auto-recording background service
 class AutoRecordingService {
-  private isRunning: boolean = false;
   private checkInterval: NodeJS.Timeout | null = null;
   private readonly intervalMs: number = 60000; // 1 minute default
 
   // Start the auto-recording background service
   start(): void {
-    if (this.isRunning) {
+    const state = getServiceState();
+    if (state.isRunning) {
       console.log('Auto-recording service is already running');
       return;
     }
 
     console.log('Starting auto-recording background service...');
+    
+    // Update database state
+    setServiceState(true);
     
     // Do an initial check immediately
     this.check();
@@ -23,7 +57,6 @@ class AutoRecordingService {
       this.check();
     }, this.intervalMs);
 
-    this.isRunning = true;
     console.log(`Auto-recording service running (interval: ${this.intervalMs}ms)`);
   }
 
@@ -33,7 +66,8 @@ class AutoRecordingService {
       clearInterval(this.checkInterval);
       this.checkInterval = null;
     }
-    this.isRunning = false;
+    // Update database state
+    setServiceState(false);
     console.log('Auto-recording service stopped');
   }
 
@@ -48,8 +82,9 @@ class AutoRecordingService {
 
   // Get service status
   getStatus(): { isRunning: boolean; intervalMs: number } {
+    const state = getServiceState();
     return {
-      isRunning: this.isRunning,
+      isRunning: state.isRunning,
       intervalMs: this.intervalMs,
     };
   }

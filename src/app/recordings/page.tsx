@@ -28,6 +28,7 @@ import {
   Play,
   Trash2,
   Filter,
+  Square,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -86,6 +87,39 @@ export default function RecordingsPage() {
       }
     } catch (error) {
       toast.error("Failed to delete recording");
+    }
+  };
+
+  const handleStopRecording = async (id: number, username: string) => {
+    if (!confirm(`Are you sure you want to stop the recording for ${username}?`)) return;
+
+    try {
+      // We need to find the streamer_id from the recording
+      const recording = recordings.find(r => r.id === id);
+      if (!recording) return;
+
+      // Get streamers to find the streamer_id by username
+      const response = await fetch(`/api/streamers`);
+      const streamers = await response.json();
+      const streamer = streamers.find((s: any) => s.username === username);
+      
+      if (!streamer) {
+        toast.error("Streamer not found");
+        return;
+      }
+
+      const stopResponse = await fetch(`/api/recordings/stop/${streamer.id}`, {
+        method: "POST",
+      });
+
+      if (stopResponse.ok) {
+        toast.success(`Stopped recording ${username}`);
+        fetchRecordings();
+      } else {
+        toast.error("Failed to stop recording");
+      }
+    } catch (error) {
+      toast.error("Failed to stop recording");
     }
   };
 
@@ -243,6 +277,20 @@ export default function RecordingsPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
+                            {recording.status === "recording" && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleStopRecording(recording.id, recording.streamer_username);
+                                }}
+                                className="text-yellow-600 hover:text-yellow-700 hover:bg-yellow-500/10 cursor-pointer"
+                                title="Stop Recording"
+                              >
+                                <Square className="w-4 h-4" />
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="icon"
@@ -250,7 +298,8 @@ export default function RecordingsPage() {
                                 e.stopPropagation();
                                 handleDelete(recording.id, recording.streamer_username);
                               }}
-                              className="text-destructive"
+                              className="text-destructive hover:bg-destructive/10 cursor-pointer"
+                              title="Delete Recording"
                             >
                               <Trash2 className="w-4 h-4" />
                             </Button>

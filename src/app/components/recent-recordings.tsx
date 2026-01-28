@@ -98,7 +98,7 @@ export function RecentRecordings({ limit = 10 }: RecentRecordingsProps) {
           <CardTitle>Recent Recordings</CardTitle>
         </div>
         <Link href="/recordings">
-          <Button variant="ghost" size="sm">
+          <Button variant="ghost" size="sm" className="cursor-pointer">
             View All
           </Button>
         </Link>
@@ -145,7 +145,7 @@ export function RecentRecordings({ limit = 10 }: RecentRecordingsProps) {
                     >
                       {recording.status}
                     </Badge>
-                    <Button variant="ghost" size="icon" asChild>
+                    <Button variant="ghost" size="icon" asChild className="cursor-pointer hover:bg-primary/10">
                       <span>
                         <ExternalLink className="w-4 h-4" />
                       </span>

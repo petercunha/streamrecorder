@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Sidebar } from "../components/sidebar";
 import { Button } from "@/components/ui/button";
@@ -49,6 +50,7 @@ interface Streamer {
 }
 
 export default function StreamersPage() {
+  const router = useRouter();
   const [streamers, setStreamers] = useState<Streamer[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -60,6 +62,12 @@ export default function StreamersPage() {
     auto_record: true,
     quality_preference: "best",
   });
+
+  const formatQuality = (quality: string) => {
+    if (quality === "best") return "Best";
+    if (quality === "worst") return "Worst";
+    return quality;
+  };
 
   useEffect(() => {
     fetchStreamers();
@@ -190,7 +198,7 @@ export default function StreamersPage() {
             </div>
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
               <DialogTrigger asChild>
-                <Button>
+                <Button className="cursor-pointer">
                   <Plus className="w-4 h-4 mr-2" />
                   Add Streamer
                 </Button>
@@ -212,6 +220,11 @@ export default function StreamersPage() {
                       onChange={(e) =>
                         setNewStreamer({ ...newStreamer, username: e.target.value })
                       }
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && newStreamer.username) {
+                          handleAddStreamer();
+                        }
+                      }}
                     />
                   </div>
                   <div className="space-y-2">
@@ -260,10 +273,10 @@ export default function StreamersPage() {
                   </div>
                 </div>
                 <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+                  <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} className="cursor-pointer">
                     Cancel
                   </Button>
-                  <Button onClick={handleAddStreamer} disabled={!newStreamer.username}>
+                  <Button onClick={handleAddStreamer} disabled={!newStreamer.username} className="cursor-pointer">
                     Add Streamer
                   </Button>
                 </DialogFooter>
@@ -315,7 +328,11 @@ export default function StreamersPage() {
                       const initials = streamer.username.slice(0, 2).toUpperCase();
 
                       return (
-                        <TableRow key={streamer.id}>
+                        <TableRow 
+                          key={streamer.id}
+                          className="cursor-pointer"
+                          onClick={() => router.push(`/streamers/${streamer.id}/edit`)}
+                        >
                           <TableCell>
                             <div className="flex items-center gap-3">
                               <Avatar className="w-10 h-10">
@@ -354,7 +371,7 @@ export default function StreamersPage() {
                               </Badge>
                             )}
                           </TableCell>
-                          <TableCell>{streamer.quality_preference}</TableCell>
+                          <TableCell>{formatQuality(streamer.quality_preference)}</TableCell>
                           <TableCell>
                             {streamer.auto_record ? (
                               <span className="text-green-500">Yes</span>
@@ -368,10 +385,11 @@ export default function StreamersPage() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  onClick={() =>
-                                    handleStopRecording(streamer.id, streamer.username)
-                                  }
-                                  className="text-yellow-500"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleStopRecording(streamer.id, streamer.username);
+                                  }}
+                                  className="text-yellow-600 hover:text-yellow-700 hover:bg-yellow-500/10 cursor-pointer"
                                 >
                                   <Square className="w-4 h-4" />
                                 </Button>
@@ -379,26 +397,33 @@ export default function StreamersPage() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  onClick={() =>
-                                    handleStartRecording(streamer.id, streamer.username)
-                                  }
-                                  className="text-green-500"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleStartRecording(streamer.id, streamer.username);
+                                  }}
+                                  className="text-green-600 hover:text-green-700 hover:bg-green-500/10 cursor-pointer"
                                 >
                                   <Play className="w-4 h-4" />
                                 </Button>
                               )}
-                              <Button variant="ghost" size="icon" asChild>
-                                <Link href={`/streamers/${streamer.id}/edit`}>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                asChild
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <Link href={`/streamers/${streamer.id}/edit`} className="cursor-pointer hover:bg-primary/10">
                                   <Edit className="w-4 h-4" />
                                 </Link>
                               </Button>
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() =>
-                                  handleDelete(streamer.id, streamer.username)
-                                }
-                                className="text-destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDelete(streamer.id, streamer.username);
+                                }}
+                                className="text-destructive hover:bg-destructive/10 cursor-pointer"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </Button>

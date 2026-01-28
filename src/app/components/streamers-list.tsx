@@ -148,7 +148,7 @@ export function StreamersList({ limit }: StreamersListProps) {
           <CardTitle>Streamers</CardTitle>
         </div>
         <Link href="/streamers">
-          <Button variant="ghost" size="sm">
+          <Button variant="ghost" size="sm" className="cursor-pointer">
             View All
           </Button>
         </Link>
@@ -159,7 +159,7 @@ export function StreamersList({ limit }: StreamersListProps) {
             <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
             <p>No streamers added yet</p>
             <Link href="/streamers">
-              <Button className="mt-4" size="sm">
+              <Button className="mt-4 cursor-pointer" size="sm">
                 <Plus className="w-4 h-4 mr-2" />
                 Add Streamer
               </Button>
@@ -218,7 +218,7 @@ export function StreamersList({ limit }: StreamersListProps) {
 
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
+                          <Button variant="ghost" size="icon" className="cursor-pointer hover:bg-primary/10">
                             <MoreHorizontal className="w-4 h-4" />
                           </Button>
                         </DropdownMenuTrigger>

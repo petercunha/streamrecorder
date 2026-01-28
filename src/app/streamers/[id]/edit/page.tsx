@@ -234,7 +234,7 @@ export default function EditStreamerPage() {
         <div className="p-6 space-y-6">
           {/* Header */}
           <div className="flex items-center gap-4">
-            <Button variant="outline" size="icon" asChild>
+            <Button variant="outline" size="icon" asChild className="cursor-pointer">
               <Link href="/streamers">
                 <ArrowLeft className="w-4 h-4" />
               </Link>
@@ -344,7 +344,7 @@ export default function EditStreamerPage() {
                     <Button
                       onClick={handleSave}
                       disabled={saving}
-                      className="min-w-[120px]"
+                      className="min-w-[120px] cursor-pointer"
                     >
                       {saving ? (
                         <>
@@ -358,7 +358,7 @@ export default function EditStreamerPage() {
                         </>
                       )}
                     </Button>
-                    <Button variant="outline" asChild>
+                    <Button variant="outline" asChild className="cursor-pointer">
                       <Link href="/streamers">Cancel</Link>
                     </Button>
                   </div>
@@ -467,7 +467,7 @@ export default function EditStreamerPage() {
                               variant="ghost"
                               size="icon"
                               onClick={(e) => handleDeleteRecording(recording.id, e)}
-                              className="text-destructive"
+                              className="text-destructive hover:bg-destructive/10 cursor-pointer"
                             >
                               <Trash2 className="w-4 h-4" />
                             </Button>

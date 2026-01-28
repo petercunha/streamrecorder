@@ -90,6 +90,21 @@ export function initDatabase() {
     )
   `);
 
+  // Service state table to track auto-recording service status
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS service_state (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      is_running BOOLEAN DEFAULT 0,
+      started_at DATETIME,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // Insert default service state if not exists
+  db.exec(`
+    INSERT OR IGNORE INTO service_state (id, is_running) VALUES (1, 0)
+  `);
+
   console.log('Database initialized at:', DB_PATH);
 }
 
