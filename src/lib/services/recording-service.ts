@@ -46,7 +46,7 @@ class RecordingService extends EventEmitter {
     if (activeRecordings.length > 0) {
       console.log(`Stopping ${activeRecordings.length} active recording(s)...`);
       
-      // First, update all active recordings in DB to stopped status
+      // First, update all active recordings in DB to completed status
       // This ensures DB is consistent even if process exits before handlers run
       const endTime = new Date();
       for (const recording of activeRecordings) {
@@ -61,9 +61,9 @@ class RecordingService extends EventEmitter {
           // File might not exist if recording failed
         }
         
-        // Update recording status in DB immediately
+        // Update recording status in DB immediately to 'completed' as requested
         RecordingModel.update(recording.recordingId, {
-          status: 'stopped',
+          status: 'completed',
           ended_at: endTime.toISOString(),
           duration_seconds: durationSeconds,
           file_size_bytes: fileSizeBytes,
@@ -72,18 +72,22 @@ class RecordingService extends EventEmitter {
         RecordingLogModel.create({
           recording_id: recording.recordingId,
           streamer_username: recording.username,
-          message: `Recording stopped due to server shutdown. Duration: ${durationSeconds}s`,
-          level: 'warn',
+          message: `Recording completed (server shutdown). Duration: ${durationSeconds}s`,
+          level: 'success',
         });
         
-        console.log(`Updated recording ${recording.recordingId} for ${recording.username} to stopped status`);
+        console.log(`Updated recording ${recording.recordingId} for ${recording.username} to completed status`);
       }
       
       // Update stats
       StatsModel.update({ active_recordings: 0 });
       
+      // Remove all from map BEFORE killing processes to prevent handleRecordingEnd from running
+      // This prevents the handleRecordingEnd callback from updating the DB again
+      const recordingsToStop = [...activeRecordings];
+      this.activeRecordings.clear();
       // Now kill the processes
-      const stopPromises = activeRecordings.map(recording => {
+      const stopPromises = recordingsToStop.map(recording => {
         return new Promise<void>((resolve) => {
           // Force kill after 2 seconds if not stopped
           const timeout = setTimeout(() => {
@@ -103,9 +107,6 @@ class RecordingService extends EventEmitter {
       });
       
       await Promise.all(stopPromises);
-      
-      // Clear the active recordings map since we've updated the DB
-      this.activeRecordings.clear();
       
       console.log('All recordings stopped and database updated');
     }

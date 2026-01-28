@@ -238,7 +238,7 @@ export default function RecordingDetailPage() {
 
           {recording.status === "recording" && (
             <Card className="bg-yellow-500/10 border-yellow-500/20">
-              <CardContent className="p-6">
+              <CardContent className="px-6">
                 <div className="flex items-center gap-3">
                   <div className="w-3 h-3 rounded-full bg-yellow-500 animate-pulse" />
                   <p className="font-medium">This recording is currently in progress</p>

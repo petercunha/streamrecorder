@@ -1,16 +1,15 @@
 import { NextResponse } from "next/server";
 import { initDatabase } from "@/lib/db";
-import { StatsModel } from "@/lib/models";
-import recordingService from "@/lib/services/recording-service";
+import { StatsModel, RecordingModel } from "@/lib/models";
 
 export async function GET() {
   try {
     initDatabase();
     const stats = StatsModel.getSystemStats();
     
-    // Use the in-memory active recordings count for consistency
-    // This ensures the dashboard shows the same count as the settings page
-    stats.activeRecordings = recordingService.getActiveCount();
+    // Use database count for active recordings for consistency
+    // (in-memory Map may not be accessible from API routes in Next.js dev mode)
+    stats.activeRecordings = RecordingModel.getActiveCount();
     
     return NextResponse.json(stats);
   } catch (error) {
