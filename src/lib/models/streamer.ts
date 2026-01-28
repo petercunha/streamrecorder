@@ -4,6 +4,7 @@ export interface Streamer {
   id: number;
   username: string;
   display_name: string | null;
+  avatar_url: string | null;
   is_active: boolean;
   auto_record: boolean;
   quality_preference: string;
@@ -14,12 +15,14 @@ export interface Streamer {
 export interface CreateStreamerInput {
   username: string;
   display_name?: string;
+  avatar_url?: string;
   auto_record?: boolean;
   quality_preference?: string;
 }
 
 export interface UpdateStreamerInput {
   display_name?: string;
+  avatar_url?: string;
   is_active?: boolean;
   auto_record?: boolean;
   quality_preference?: string;
@@ -29,14 +32,15 @@ export const StreamerModel = {
   // Create a new streamer
   create(input: CreateStreamerInput): Streamer {
     const stmt = db.prepare(`
-      INSERT INTO streamers (username, display_name, auto_record, quality_preference)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO streamers (username, display_name, avatar_url, auto_record, quality_preference)
+      VALUES (?, ?, ?, ?, ?)
       RETURNING *
     `);
 
     const result = stmt.get(
       input.username.toLowerCase(),
       input.display_name || input.username,
+      input.avatar_url || null,
       (input.auto_record ?? true) ? 1 : 0,
       input.quality_preference || 'best'
     ) as Streamer;
@@ -74,6 +78,10 @@ export const StreamerModel = {
     if (input.display_name !== undefined) {
       sets.push('display_name = ?');
       values.push(input.display_name);
+    }
+    if (input.avatar_url !== undefined) {
+      sets.push('avatar_url = ?');
+      values.push(input.avatar_url);
     }
     if (input.is_active !== undefined) {
       sets.push('is_active = ?');

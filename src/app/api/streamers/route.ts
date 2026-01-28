@@ -2,6 +2,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { initDatabase } from "@/lib/db";
 import { StreamerModel } from "@/lib/models";
 
+// Fetch Twitch avatar using decapi.me (free, no auth required)
+async function fetchTwitchAvatar(username: string): Promise<string | null> {
+  try {
+    const response = await fetch(`https://decapi.me/twitch/avatar/${encodeURIComponent(username)}`);
+    if (response.ok) {
+      const avatarUrl = await response.text();
+      // Check if we got a valid URL (not an error message)
+      if (avatarUrl.startsWith('http')) {
+        return avatarUrl.trim();
+      }
+    }
+  } catch (error) {
+    console.error('Failed to fetch avatar:', error);
+  }
+  return null;
+}
+
 // GET /api/streamers - List all streamers
 export async function GET(request: NextRequest) {
   try {
@@ -43,9 +60,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Fetch avatar from Twitch
+    const avatarUrl = await fetchTwitchAvatar(body.username);
+
     const streamer = StreamerModel.create({
       username: body.username,
       display_name: body.display_name,
+      avatar_url: avatarUrl || undefined,
       auto_record: body.auto_record,
       quality_preference: body.quality_preference,
     });

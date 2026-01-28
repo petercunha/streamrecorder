@@ -32,7 +32,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Plus, Search, Play, Square, Trash2, Edit, Users } from "lucide-react";
 import { toast } from "sonner";
@@ -41,6 +41,7 @@ interface Streamer {
   id: number;
   username: string;
   display_name: string | null;
+  avatar_url: string | null;
   is_active: boolean;
   auto_record: boolean;
   quality_preference: string;
@@ -318,6 +319,11 @@ export default function StreamersPage() {
                           <TableCell>
                             <div className="flex items-center gap-3">
                               <Avatar className="w-10 h-10">
+                                <AvatarImage 
+                                  src={streamer.avatar_url || undefined} 
+                                  alt={streamer.username}
+                                  className="object-cover"
+                                />
                                 <AvatarFallback className="bg-primary/20 text-primary">
                                   {initials}
                                 </AvatarFallback>

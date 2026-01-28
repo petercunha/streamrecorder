@@ -74,6 +74,49 @@ class RecordingService extends EventEmitter {
     }
   }
 
+  // Get stream metadata from streamlink
+  async getStreamMetadata(username: string): Promise<{ title: string; category: string } | null> {
+    return new Promise((resolve) => {
+      const streamlink = spawn('streamlink', [
+        '--json',
+        `https://twitch.tv/${username}`,
+        'best'
+      ]);
+
+      let output = '';
+      
+      streamlink.stdout.on('data', (data) => {
+        output += data.toString();
+      });
+
+      streamlink.on('close', (code) => {
+        try {
+          const result = JSON.parse(output);
+          if (result.metadata) {
+            resolve({
+              title: result.metadata.title || '',
+              category: result.metadata.category || ''
+            });
+          } else {
+            resolve(null);
+          }
+        } catch {
+          resolve(null);
+        }
+      });
+
+      streamlink.on('error', () => {
+        resolve(null);
+      });
+
+      // Timeout after 10 seconds
+      setTimeout(() => {
+        streamlink.kill();
+        resolve(null);
+      }, 10000);
+    });
+  }
+
   // Check if a streamer is live using streamlink
   async checkIfLive(username: string): Promise<boolean> {
     return new Promise((resolve) => {
@@ -92,7 +135,8 @@ class RecordingService extends EventEmitter {
       streamlink.on('close', (code) => {
         try {
           const result = JSON.parse(output);
-          resolve(!!result.streams && Object.keys(result.streams).length > 0);
+          // Stream is live if there's no error and type is set (usually 'hls')
+          resolve(!result.error && !!result.type);
         } catch {
           resolve(false);
         }
@@ -122,16 +166,21 @@ class RecordingService extends EventEmitter {
       throw new Error('Already recording this streamer');
     }
 
+    // Get stream metadata before starting
+    const metadata = await this.getStreamMetadata(streamer.username);
+
     // Create filename with timestamp
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const filename = `${streamer.username}_${timestamp}.mp4`;
     const filePath = path.join(RECORDINGS_DIR, filename);
 
-    // Create recording record
+    // Create recording record with metadata
     const recording = RecordingModel.create({
       streamer_id: streamerId,
       file_path: filePath,
       quality: streamer.quality_preference,
+      stream_title: metadata?.title,
+      stream_category: metadata?.category,
     });
 
     // Start streamlink process

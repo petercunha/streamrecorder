@@ -24,6 +24,7 @@ export function initDatabase() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT UNIQUE NOT NULL,
       display_name TEXT,
+      avatar_url TEXT,
       is_active BOOLEAN DEFAULT 1,
       auto_record BOOLEAN DEFAULT 1,
       quality_preference TEXT DEFAULT 'best',
@@ -67,6 +68,14 @@ export function initDatabase() {
   db.exec(`
     INSERT OR IGNORE INTO stats (id) VALUES (1)
   `);
+
+  // Migration: Add avatar_url column to streamers table if it doesn't exist
+  try {
+    db.exec(`ALTER TABLE streamers ADD COLUMN avatar_url TEXT`);
+    console.log('Migration: Added avatar_url column to streamers table');
+  } catch (e) {
+    // Column already exists, ignore error
+  }
 
   // Recording logs table for real-time activity
   db.exec(`
