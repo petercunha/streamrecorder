@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Sidebar } from "../../components/sidebar";
@@ -18,11 +18,6 @@ import {
   Trash2,
   Loader2,
   AlertCircle,
-  Play,
-  Pause,
-  Volume2,
-  VolumeX,
-  Maximize,
   Download,
   Square,
 } from "lucide-react";
@@ -51,17 +46,23 @@ export default function RecordingDetailPage() {
   const params = useParams();
   const router = useRouter();
   const id = parseInt(params.id as string);
-  const videoRef = useRef<HTMLVideoElement>(null);
 
   const [recording, setRecording] = useState<Recording | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
 
   useEffect(() => {
     fetchRecording();
   }, [id]);
+
+  useEffect(() => {
+    if (recording?.file_path) {
+      const filename = recording.file_path.split("/").pop();
+      if (filename) {
+        setVideoUrl(`/recordings/${filename}`);
+      }
+    }
+  }, [recording]);
 
   const fetchRecording = async () => {
     try {
@@ -72,12 +73,6 @@ export default function RecordingDetailPage() {
         const recordingData = Array.isArray(data) ? data[0] : data;
         if (recordingData) {
           setRecording(recordingData);
-          // Create a video URL from the file path
-          // The file path is relative, so we need to serve it from the recordings folder
-          const filename = recordingData.file_path.split("/").pop();
-          if (filename) {
-            setVideoUrl(`/recordings/${filename}`);
-          }
         } else {
           toast.error("Recording not found");
           router.push("/recordings");
@@ -131,34 +126,6 @@ export default function RecordingDetailPage() {
       }
     } catch (error) {
       toast.error("Failed to stop recording");
-    }
-  };
-
-  const togglePlay = () => {
-    if (videoRef.current) {
-      if (isPlaying) {
-        videoRef.current.pause();
-      } else {
-        videoRef.current.play();
-      }
-      setIsPlaying(!isPlaying);
-    }
-  };
-
-  const toggleMute = () => {
-    if (videoRef.current) {
-      videoRef.current.muted = !isMuted;
-      setIsMuted(!isMuted);
-    }
-  };
-
-  const toggleFullscreen = () => {
-    if (videoRef.current) {
-      if (document.fullscreenElement) {
-        document.exitFullscreen();
-      } else {
-        videoRef.current.requestFullscreen();
-      }
     }
   };
 
@@ -229,7 +196,7 @@ export default function RecordingDetailPage() {
   }
 
   const filename = recording.file_path.split("/").pop() || recording.file_path;
-  const canPlay = recording.status === "completed" || recording.status === "stopped";
+  const canDownload = recording.status === "completed" || recording.status === "stopped";
 
   return (
     <div className="flex h-screen bg-background">
@@ -268,73 +235,6 @@ export default function RecordingDetailPage() {
               </Button>
             </div>
           </div>
-
-          {/* Video Player */}
-          {canPlay && videoUrl && (
-            <Card className="overflow-hidden">
-              <CardContent className="p-0">
-                <div className="relative bg-black aspect-video">
-                  <video
-                    ref={videoRef}
-                    src={videoUrl}
-                    className="w-full h-full"
-                    onPlay={() => setIsPlaying(true)}
-                    onPause={() => setIsPlaying(false)}
-                    onEnded={() => setIsPlaying(false)}
-                  />
-                  {/* Custom Controls Overlay */}
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 opacity-0 hover:opacity-100 transition-opacity">
-                    <div className="flex items-center gap-4">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-white hover:bg-white/20"
-                        onClick={togglePlay}
-                      >
-                        {isPlaying ? (
-                          <Pause className="w-6 h-6" />
-                        ) : (
-                          <Play className="w-6 h-6" />
-                        )}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-white hover:bg-white/20"
-                        onClick={toggleMute}
-                      >
-                        {isMuted ? (
-                          <VolumeX className="w-5 h-5" />
-                        ) : (
-                          <Volume2 className="w-5 h-5" />
-                        )}
-                      </Button>
-                      <div className="flex-1" />
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-white hover:bg-white/20"
-                        onClick={toggleFullscreen}
-                      >
-                        <Maximize className="w-5 h-5" />
-                      </Button>
-                    </div>
-                  </div>
-                  {/* Play Button Center Overlay (shown when paused) */}
-                  {!isPlaying && (
-                    <div
-                      className="absolute inset-0 flex items-center justify-center cursor-pointer"
-                      onClick={togglePlay}
-                    >
-                      <div className="w-20 h-20 rounded-full bg-primary/90 flex items-center justify-center hover:bg-primary transition-colors">
-                        <Play className="w-10 h-10 text-primary-foreground ml-1" />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
 
           {recording.status === "recording" && (
             <Card className="bg-yellow-500/10 border-yellow-500/20">
@@ -425,7 +325,7 @@ export default function RecordingDetailPage() {
                       {recording.file_path}
                     </p>
                   </div>
-                  {canPlay && videoUrl && (
+                  {canDownload && videoUrl && (
                     <div className="pt-2">
                       <Button asChild>
                         <a href={videoUrl} download={filename}>

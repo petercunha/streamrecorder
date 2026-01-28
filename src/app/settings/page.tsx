@@ -23,7 +23,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   Settings, 
   FolderOpen, 
@@ -53,13 +52,6 @@ interface ServiceStatus {
     autoRecordEnabled: number;
     activeRecordings: number;
   };
-  recordings: Array<{
-    recordingId: number;
-    streamerId: number;
-    username: string;
-    startTime: string;
-    filePath: string;
-  }>;
 }
 
 export default function SettingsPage() {
@@ -131,18 +123,7 @@ export default function SettingsPage() {
     toast.success("Settings saved successfully");
   };
 
-  const formatDuration = (startTime: string) => {
-    const start = new Date(startTime);
-    const now = new Date();
-    const diffMs = now.getTime() - start.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMins / 60);
-    
-    if (diffHours > 0) {
-      return `${diffHours}h ${diffMins % 60}m`;
-    }
-    return `${diffMins}m`;
-  };
+
 
   return (
     <div className="flex h-screen bg-background">
@@ -242,30 +223,7 @@ export default function SettingsPage() {
                     )}
                   </Button>
 
-                  {/* Active Recordings */}
-                  {serviceStatus && serviceStatus.recordings.length > 0 && (
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium">Active Recordings</Label>
-                      <ScrollArea className="h-[150px] border rounded-lg p-2">
-                        <div className="space-y-2">
-                          {serviceStatus.recordings.map((recording) => (
-                            <div 
-                              key={recording.recordingId}
-                              className="flex items-center justify-between p-2 bg-red-500/10 rounded-lg border border-red-500/20"
-                            >
-                              <div className="flex items-center gap-2">
-                                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                                <span className="font-medium">{recording.username}</span>
-                              </div>
-                              <span className="text-sm text-muted-foreground">
-                                {formatDuration(recording.startTime)}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </ScrollArea>
-                    </div>
-                  )}
+
                 </CardContent>
               </Card>
 

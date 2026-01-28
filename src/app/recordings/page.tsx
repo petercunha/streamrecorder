@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Search,
   Video,
@@ -36,6 +37,7 @@ interface Recording {
   id: number;
   streamer_username: string;
   streamer_display_name: string;
+  streamer_avatar_url: string | null;
   stream_title: string | null;
   stream_category: string | null;
   status: "recording" | "completed" | "error" | "stopped";
@@ -240,13 +242,25 @@ export default function RecordingsPage() {
                         onClick={() => router.push(`/recordings/${recording.id}`)}
                       >
                         <TableCell>
-                          <div>
-                            <p className="font-medium">
-                              {recording.streamer_display_name || recording.streamer_username}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              @{recording.streamer_username}
-                            </p>
+                          <div className="flex items-center gap-3">
+                            <Avatar className="w-10 h-10">
+                              <AvatarImage 
+                                src={recording.streamer_avatar_url || undefined} 
+                                alt={recording.streamer_username}
+                                className="object-cover"
+                              />
+                              <AvatarFallback className="bg-primary/20 text-primary text-sm">
+                                {recording.streamer_username.slice(0, 2).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="font-medium">
+                                {recording.streamer_display_name || recording.streamer_username}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                @{recording.streamer_username}
+                              </p>
+                            </div>
                           </div>
                         </TableCell>
                         <TableCell>

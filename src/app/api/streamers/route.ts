@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { initDatabase } from "@/lib/db";
 import { StreamerModel } from "@/lib/models";
+import recordingService from "@/lib/services/recording-service";
 
 // Fetch Twitch avatar using decapi.me (free, no auth required)
 async function fetchTwitchAvatar(username: string): Promise<string | null> {
@@ -70,6 +71,15 @@ export async function POST(request: NextRequest) {
       auto_record: body.auto_record,
       quality_preference: body.quality_preference,
     });
+
+    // If auto_record is enabled, immediately check if the streamer is live
+    if (streamer.auto_record) {
+      console.log(`Auto-record enabled for ${streamer.username}, checking if live...`);
+      // Run the check in the background without awaiting to not delay the response
+      recordingService.checkAndRecordStreamers().catch((error) => {
+        console.error(`Error checking live status for ${streamer.username}:`, error);
+      });
+    }
 
     return NextResponse.json(streamer, { status: 201 });
   } catch (error) {

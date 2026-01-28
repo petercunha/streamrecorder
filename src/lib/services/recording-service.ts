@@ -18,6 +18,7 @@ interface ActiveRecording {
 class RecordingService extends EventEmitter {
   private activeRecordings: Map<number, ActiveRecording> = new Map();
   private checkInterval: NodeJS.Timeout | null = null;
+  private isShuttingDown = false;
 
   constructor() {
     super();
@@ -25,6 +26,54 @@ class RecordingService extends EventEmitter {
     if (!fs.existsSync(RECORDINGS_DIR)) {
       fs.mkdirSync(RECORDINGS_DIR, { recursive: true });
     }
+  }
+
+  // Graceful shutdown - stop all active recordings
+  async shutdown(): Promise<void> {
+    if (this.isShuttingDown) {
+      return;
+    }
+    this.isShuttingDown = true;
+    
+    console.log('Shutting down recording service...');
+    
+    // Stop the auto checker
+    this.stopAutoChecker();
+    
+    // Stop all active recordings
+    const activeRecordings = this.getActiveRecordings();
+    if (activeRecordings.length > 0) {
+      console.log(`Stopping ${activeRecordings.length} active recording(s)...`);
+      
+      const stopPromises = activeRecordings.map(recording => {
+        return new Promise<void>((resolve) => {
+          const activeRecording = this.activeRecordings.get(recording.streamerId);
+          if (activeRecording) {
+            // Force kill after 5 seconds if not stopped
+            const timeout = setTimeout(() => {
+              if (!activeRecording.process.killed) {
+                activeRecording.process.kill('SIGKILL');
+              }
+              resolve();
+            }, 5000);
+            
+            activeRecording.process.on('close', () => {
+              clearTimeout(timeout);
+              resolve();
+            });
+            
+            activeRecording.process.kill('SIGTERM');
+          } else {
+            resolve();
+          }
+        });
+      });
+      
+      await Promise.all(stopPromises);
+      console.log('All recordings stopped');
+    }
+    
+    console.log('Recording service shutdown complete');
   }
 
   // Start the auto-recording checker
