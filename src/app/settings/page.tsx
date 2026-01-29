@@ -172,7 +172,7 @@ export default function SettingsPage() {
                         <p className="text-sm text-muted-foreground">
                           {serviceStatus?.autoRecording.isRunning 
                             ? `Running (checks every ${serviceStatus.autoRecording.checkIntervalMs / 1000}s)` 
-                            : 'Stopped - Use CLI to start service'}
+                            : 'Stopped - Auto-recording disabled'}
                         </p>
                       </div>
                     </div>

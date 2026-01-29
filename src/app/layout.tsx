@@ -3,8 +3,8 @@ import { Inter } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
-// Initialize server-side services (auto-recording, etc.)
-import "@/lib/server-init";
+// Server initialization is handled by Next.js Instrumentation API
+// See: src/instrumentation.ts
 
 const inter = Inter({
   subsets: ["latin"],

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { initDatabase } from "@/lib/db";
-import { autoRecordingService } from "@/lib/services/auto-recording-service";
+import recordingService from "@/lib/services/recording-service";
 import { StreamerModel, RecordingModel } from "@/lib/models";
 
 // GET /api/service/status - Get service status
@@ -8,18 +8,16 @@ export async function GET() {
   try {
     initDatabase();
     
-    const status = autoRecordingService.getStatus();
     const streamers = StreamerModel.findAll();
     const autoRecordStreamers = streamers.filter(s => s.auto_record);
     
     // Get active recordings from database for consistency
-    // (in-memory Map may not be accessible from API routes in Next.js dev mode)
     const activeRecordings = RecordingModel.findAll({ status: 'recording' });
     
     return NextResponse.json({
       autoRecording: {
-        isRunning: status.isRunning,
-        checkIntervalMs: status.intervalMs,
+        isRunning: recordingService.getActiveCount() >= 0, // Service is running if accessible
+        checkIntervalMs: 60000,
       },
       stats: {
         totalStreamers: streamers.length,

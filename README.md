@@ -1,6 +1,6 @@
 # TwitchRecorder
 
-A comprehensive TypeScript application for recording Twitch livestreams, featuring both a powerful CLI interface and a beautiful web dashboard built with Next.js 16 and ShadCN UI.
+A comprehensive TypeScript application for recording Twitch livestreams with a beautiful web dashboard built with Next.js 16 and ShadCN UI.
 
 ![TwitchRecorder](https://img.shields.io/badge/Twitch-Recorder-9146FF?style=for-the-badge&logo=twitch&logoColor=white)
 ![Next.js](https://img.shields.io/badge/Next.js-16-000000?style=for-the-badge&logo=next.js&logoColor=white)
@@ -9,19 +9,14 @@ A comprehensive TypeScript application for recording Twitch livestreams, featuri
 
 ## Features
 
-### CLI Interface
-- **Streamer Management**: Add, remove, edit, and list streamers to monitor
-- **Recording Control**: Start/stop recordings manually or enable auto-recording
-- **Statistics**: View system stats including total downloaded, active recordings, and more
-- **Activity Logs**: Real-time logs of recording activity
-- **Service Mode**: Run as a background service with auto-checking for live streams
-
 ### Web Interface
 - **Dashboard**: Beautiful overview with stats cards and activity monitoring
 - **Streamer Management**: Full CRUD interface for managing streamers
 - **Recordings Browser**: Search, filter, and manage recorded streams
 - **Live Monitoring**: Real-time activity logs and recording status
 - **Responsive Design**: Works on desktop and mobile devices
+- **Auto-Recording**: Automatically start recording when monitored streamers go live
+- **Manual Controls**: Start/stop recordings manually from the web interface
 
 ### Core Features
 - **Streamlink Integration**: Uses streamlink-cli for high-quality stream downloads
@@ -67,99 +62,19 @@ cd streamrecorder
 npm install
 ```
 
-3. Run web portal
+3. Run the development server:
 ```bash
 npm run dev
 ```
 Then go to http://localhost:3000 in your browser!
 
----
-
-4. (Optional) Build the CLI:
+4. For production:
 ```bash
-npm run cli:build
-```
-
-5. (Optional) Link the CLI globally:
-```bash
-npm link
+npm run build
+npm start
 ```
 
 ## Usage
-
-### CLI Commands
-
-#### Streamer Management
-```bash
-# List all streamers
-twitch-recorder streamers list
-twitch-recorder s ls
-
-# Add a new streamer
-twitch-recorder streamers add <username>
-twitch-recorder s add shroud --quality 1080p60 --auto
-
-# Remove a streamer
-twitch-recorder streamers remove <id>
-twitch-recorder s rm 1
-
-# Edit a streamer
-twitch-recorder streamers edit <id>
-
-# Show streamer info
-twitch-recorder streamers info <id>
-```
-
-#### Recording Management
-```bash
-# List all recordings
-twitch-recorder recordings list
-twitch-recorder r ls
-
-# Show recording info
-twitch-recorder recordings info <id>
-
-# Delete a recording
-twitch-recorder recordings delete <id>
-twitch-recorder r rm 1
-
-# Start recording manually
-twitch-recorder recordings start <username>
-
-# Stop recording
-twitch-recorder recordings stop <username>
-```
-
-#### Statistics
-```bash
-# Show all stats
-twitch-recorder stats show
-twitch-recorder st s
-
-# Show active recordings
-twitch-recorder stats active
-twitch-recorder st a
-
-# Show download speed
-twitch-recorder stats speed
-
-# Show storage info
-twitch-recorder stats storage
-```
-
-#### Service Mode
-```bash
-# Start the auto-recording service
-twitch-recorder service start
-twitch-recorder svc start
-
-# Check streamers immediately
-twitch-recorder service check
-
-# View logs
-twitch-recorder service logs
-twitch-recorder service logs --follow
-```
 
 ### Web Interface
 
@@ -170,11 +85,24 @@ npm run dev
 
 2. Open your browser to `http://localhost:3000`
 
-3. For production:
-```bash
-npm run build
-npm start
-```
+3. Add streamers to monitor via the Streamers page
+
+4. Enable "Auto-record" on streamers you want to automatically record when they go live
+
+5. View recordings, manage settings, and monitor activity from the web dashboard
+
+### Managing Streamers
+
+- **Add Streamers**: Go to `/streamers` and click "Add Streamer"
+- **Edit Streamers**: Click on a streamer to edit their settings
+- **Auto-Record**: Toggle auto-recording per streamer
+- **Quality Preference**: Set preferred quality (best, 1080p60, 720p60, etc.)
+
+### Recording Controls
+
+- **Auto-Recording**: The app automatically checks every 60 seconds for live streamers
+- **Manual Check**: Go to Settings and click "Check for Live Streamers Now"
+- **Manual Recording**: Start/stop recordings from the streamer details page
 
 ## Project Structure
 
@@ -185,38 +113,34 @@ twitch-recorder/
 │   │   ├── api/               # API routes
 │   │   │   ├── logs/
 │   │   │   ├── recordings/
+│   │   │   ├── service/
 │   │   │   ├── stats/
 │   │   │   └── streamers/
 │   │   ├── components/        # React components
 │   │   ├── streamers/         # Streamers page
 │   │   ├── recordings/        # Recordings page
+│   │   ├── monitor/           # Live monitor page
+│   │   ├── settings/          # Settings page
 │   │   ├── globals.css
 │   │   ├── layout.tsx
 │   │   └── page.tsx           # Dashboard
-│   ├── cli/                   # CLI interface
-│   │   ├── commands/
-│   │   │   ├── recordings.ts
-│   │   │   ├── service.ts
-│   │   │   ├── stats.ts
-│   │   │   └── streamers.ts
-│   │   └── index.ts
 │   ├── components/ui/         # ShadCN UI components
-│   └── lib/
-│       ├── db.ts              # Database initialization
-│       ├── models/            # Data models
-│       │   ├── index.ts
-│       │   ├── recording-log.ts
-│       │   ├── recording.ts
-│       │   ├── stats.ts
-│       │   └── streamer.ts
-│       ├── services/          # Business logic
-│       │   └── recording-service.ts
-│       └── utils.ts
+│   ├── lib/
+│   │   ├── db.ts              # Database initialization
+│   │   ├── models/            # Data models
+│   │   │   ├── index.ts
+│   │   │   ├── recording-log.ts
+│   │   │   ├── recording.ts
+│   │   │   ├── stats.ts
+│   │   │   └── streamer.ts
+│   │   ├── services/          # Business logic
+│   │   │   └── recording-service.ts
+│   │   └── utils.ts
+│   └── instrumentation.ts     # Server initialization
 ├── data/                      # SQLite database
 ├── recordings/                # Recorded streams
 ├── package.json
 ├── tsconfig.json
-├── tsconfig.cli.json
 └── next.config.ts
 ```
 
@@ -286,6 +210,10 @@ RECORDINGS_DIR=/path/to/recordings
 - `POST /api/recordings/start/:id` - Start recording
 - `POST /api/recordings/stop/:id` - Stop recording
 
+### Service
+- `GET /api/service/status` - Get service status
+- `POST /api/service/check` - Trigger manual check for live streamers
+
 ### Logs
 - `GET /api/logs` - Get recent logs
 
@@ -294,21 +222,13 @@ RECORDINGS_DIR=/path/to/recordings
 ### Running in Development Mode
 
 ```bash
-# Terminal 1: Web interface
 npm run dev
-
-# Terminal 2: CLI (using tsx)
-npm run cli:dev -- streamers list
 ```
 
 ### Building
 
 ```bash
-# Build web interface
 npm run build
-
-# Build CLI
-npm run cli:build
 ```
 
 ### Adding ShadCN Components
@@ -334,6 +254,21 @@ chmod 755 recordings
 
 ### Database locked
 If you see "database is locked" errors, wait a moment and try again. SQLite WAL mode is enabled for better concurrency.
+
+### Auto-recording not working
+- Check that streamers have `auto_record` enabled
+- Verify streamlink is installed and working: `streamlink --version`
+- Check the logs at `/api/logs` for any errors
+- The app checks every 60 seconds for live streamers
+
+## Architecture Notes
+
+This is a pure Next.js application. The auto-recording functionality runs as part of the Next.js server process:
+
+1. **Server Initialization**: When the Next.js server starts, it initializes the database and starts the auto-recording service
+2. **Auto-Recording**: The service checks every 60 seconds for streamers with `auto_record` enabled and starts recording if they're live
+3. **Graceful Shutdown**: When the server is stopped (SIGTERM/SIGINT), all active recordings are properly finalized
+4. **No Background Process**: Unlike previous versions, there is no separate background daemon - recording only happens while the Next.js server is running
 
 ## License
 

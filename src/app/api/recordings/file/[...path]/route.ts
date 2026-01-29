@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createReadStream, statSync } from "fs";
-import { existsSync } from "fs";
+import { createReadStream, statSync, existsSync } from "fs";
 import path from "path";
+
+const RECORDINGS_DIR = process.env.RECORDINGS_DIR || path.join(process.cwd(), "recordings");
 
 export async function GET(
   request: NextRequest,
@@ -9,12 +10,11 @@ export async function GET(
 ) {
   try {
     const { path: pathSegments } = await params;
-    const filePath = path.join(process.cwd(), "recordings", ...pathSegments);
+    const filePath = path.join(RECORDINGS_DIR, ...pathSegments);
     
     // Security check: ensure the file is within the recordings directory
-    const recordingsDir = path.join(process.cwd(), "recordings");
     const resolvedPath = path.resolve(filePath);
-    const resolvedRecordingsDir = path.resolve(recordingsDir);
+    const resolvedRecordingsDir = path.resolve(RECORDINGS_DIR);
     
     if (!resolvedPath.startsWith(resolvedRecordingsDir)) {
       return NextResponse.json(
@@ -89,7 +89,6 @@ export async function GET(
       });
     } else {
       // No range requested, return entire file
-      // For large files, we still want to stream them
       const readStream = createReadStream(filePath);
       
       // Convert stream to buffer (for NextResponse compatibility)
