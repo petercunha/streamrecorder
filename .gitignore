@@ -46,3 +46,5 @@ coverage
 
 # Misc
 *.log
+# next-agents-md
+.next-docs/
