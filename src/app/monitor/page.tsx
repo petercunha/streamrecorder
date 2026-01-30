@@ -37,8 +37,10 @@ export default function MonitorPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     fetchData();
     const interval = setInterval(() => {
       fetchData();
@@ -82,7 +84,8 @@ export default function MonitorPage() {
   };
 
   const formatDuration = (seconds: number) => {
-    if (seconds === 0) return "Just started";
+    // Handle negative values gracefully
+    if (seconds <= 0) return "Just started";
     const hours = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
@@ -91,9 +94,12 @@ export default function MonitorPage() {
   };
 
   const calculateDuration = (startedAt: string) => {
-    const start = new Date(startedAt).getTime();
-    const now = currentTime.getTime();
-    return Math.floor((now - start) / 1000);
+    // SQLite DATETIME is UTC, but new Date() interprets strings without timezone as local time.
+    // Convert "YYYY-MM-DD HH:MM:SS" to ISO 8601 UTC by replacing space with 'T' and appending 'Z'
+    const isoString = startedAt.replace(' ', 'T') + 'Z';
+    const start = new Date(isoString).getTime();
+    const now = Date.now();
+    return Math.max(0, Math.floor((now - start) / 1000));
   };
 
   return (
@@ -112,7 +118,7 @@ export default function MonitorPage() {
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse" />
               <span className="text-sm text-muted-foreground">
-                Last updated: {currentTime.toLocaleTimeString()}
+                Last updated: {mounted ? currentTime.toLocaleTimeString() : "--:--:--"}
               </span>
             </div>
           </div>
@@ -256,12 +262,12 @@ export default function MonitorPage() {
                                     </Badge>
                                   )}
                                   <span>Quality: {recording.quality || "best"}</span>
-                                  <span>Started: {new Date(recording.started_at).toLocaleTimeString()}</span>
+                                  <span>Started: {mounted ? new Date(recording.started_at).toLocaleTimeString() : "--:--:--"}</span>
                                 </div>
                               </div>
                               <div className="text-right min-w-[150px]">
                                 <div className="text-2xl font-mono font-bold">
-                                  {formatDuration(duration)}
+                                  {mounted ? formatDuration(duration) : "--m --s"}
                                 </div>
                                 <p className="text-sm text-muted-foreground mt-1">
                                   {formatBytes(recording.file_size_bytes)}

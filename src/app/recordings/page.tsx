@@ -54,8 +54,10 @@ export default function RecordingsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     fetchRecordings();
     const interval = setInterval(fetchRecordings, 5000);
     return () => clearInterval(interval);
@@ -134,11 +136,19 @@ export default function RecordingsPage() {
   };
 
   const formatDuration = (seconds: number) => {
-    if (seconds === 0) return "-";
+    if (seconds <= 0) return "Just started";
     const hours = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
     if (hours > 0) return `${hours}h ${mins}m`;
     return `${mins}m ${seconds % 60}s`;
+  };
+
+  const calculateDuration = (startedAt: string) => {
+    // SQLite DATETIME is UTC, convert to ISO 8601 UTC for correct parsing
+    const isoString = startedAt.replace(' ', 'T') + 'Z';
+    const start = new Date(isoString).getTime();
+    const now = Date.now();
+    return Math.max(0, Math.floor((now - start) / 1000));
   };
 
   const getStatusColor = (status: string) => {
@@ -285,9 +295,15 @@ export default function RecordingsPage() {
                           </Badge>
                         </TableCell>
                         <TableCell>{formatBytes(recording.file_size_bytes)}</TableCell>
-                        <TableCell>{formatDuration(recording.duration_seconds)}</TableCell>
                         <TableCell>
-                          {new Date(recording.started_at).toLocaleString()}
+                          {mounted && recording.status === 'recording'
+                            ? formatDuration(calculateDuration(recording.started_at))
+                            : formatDuration(recording.duration_seconds)}
+                        </TableCell>
+                        <TableCell>
+                          {mounted
+                            ? new Date(recording.started_at.replace(' ', 'T') + 'Z').toLocaleString()
+                            : "--"}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">

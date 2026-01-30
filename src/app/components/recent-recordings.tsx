@@ -26,8 +26,10 @@ interface RecentRecordingsProps {
 export function RecentRecordings({ limit = 10 }: RecentRecordingsProps) {
   const [recordings, setRecordings] = useState<Recording[]>([]);
   const [loading, setLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     fetchRecordings();
     const interval = setInterval(fetchRecordings, 5000);
     return () => clearInterval(interval);
@@ -54,11 +56,19 @@ export function RecentRecordings({ limit = 10 }: RecentRecordingsProps) {
   };
 
   const formatDuration = (seconds: number) => {
-    if (seconds === 0) return "-";
+    if (seconds <= 0) return "Just started";
     const hours = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
     if (hours > 0) return `${hours}h ${mins}m`;
     return `${mins}m ${seconds % 60}s`;
+  };
+
+  const calculateDuration = (startedAt: string) => {
+    // SQLite DATETIME is UTC, convert to ISO 8601 UTC for correct parsing
+    const isoString = startedAt.replace(' ', 'T') + 'Z';
+    const start = new Date(isoString).getTime();
+    const now = Date.now();
+    return Math.max(0, Math.floor((now - start) / 1000));
   };
 
   const getStatusColor = (status: string) => {
@@ -133,7 +143,11 @@ export function RecentRecordings({ limit = 10 }: RecentRecordingsProps) {
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <span>{formatBytes(recording.file_size_bytes)}</span>
                         <span>•</span>
-                        <span>{formatDuration(recording.duration_seconds)}</span>
+                        <span>
+                          {mounted && recording.status === 'recording'
+                            ? formatDuration(calculateDuration(recording.started_at))
+                            : formatDuration(recording.duration_seconds)}
+                        </span>
                       </div>
                     </div>
                   </div>

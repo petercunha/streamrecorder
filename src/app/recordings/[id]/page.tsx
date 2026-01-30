@@ -50,8 +50,10 @@ export default function RecordingDetailPage() {
   const [recording, setRecording] = useState<Recording | null>(null);
   const [loading, setLoading] = useState(true);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     fetchRecording();
   }, [id]);
 
@@ -138,12 +140,20 @@ export default function RecordingDetailPage() {
   };
 
   const formatDuration = (seconds: number) => {
-    if (seconds === 0) return "-";
+    if (seconds <= 0) return "Just started";
     const hours = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
     if (hours > 0) return `${hours}h ${mins}m ${secs}s`;
     return `${mins}m ${secs}s`;
+  };
+
+  const calculateDuration = (startedAt: string) => {
+    // SQLite DATETIME is UTC, convert to ISO 8601 UTC for correct parsing
+    const isoString = startedAt.replace(' ', 'T') + 'Z';
+    const start = new Date(isoString).getTime();
+    const now = Date.now();
+    return Math.max(0, Math.floor((now - start) / 1000));
   };
 
   const getStatusColor = (status: string) => {
@@ -398,7 +408,9 @@ export default function RecordingDetailPage() {
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Duration</span>
                     <span className="font-mono font-medium">
-                      {formatDuration(recording.duration_seconds)}
+                      {mounted && recording.status === 'recording'
+                        ? formatDuration(calculateDuration(recording.started_at))
+                        : formatDuration(recording.duration_seconds)}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
@@ -421,14 +433,18 @@ export default function RecordingDetailPage() {
                   <div>
                     <span className="text-sm text-muted-foreground">Started</span>
                     <p className="font-medium">
-                      {new Date(recording.started_at).toLocaleString()}
+                      {mounted
+                        ? new Date(recording.started_at.replace(' ', 'T') + 'Z').toLocaleString()
+                        : "--"}
                     </p>
                   </div>
                   {recording.ended_at && (
                     <div>
                       <span className="text-sm text-muted-foreground">Ended</span>
                       <p className="font-medium">
-                        {new Date(recording.ended_at).toLocaleString()}
+                        {mounted
+                          ? new Date(recording.ended_at.replace(' ', 'T') + 'Z').toLocaleString()
+                          : "--"}
                       </p>
                     </div>
                   )}
