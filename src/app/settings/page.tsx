@@ -39,6 +39,9 @@ import {
   Clock,
   Bell,
   Info,
+  HardDrive,
+  AlertTriangle,
+  CheckCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -54,33 +57,43 @@ interface ServiceStatus {
   };
 }
 
+interface AppSettings {
+  minFreeDiskMb: number;
+  maxRecordingSizeMb: number;
+  maxTotalRecordingsMb: number;
+  maxRecordingDurationHours: number;
+  checkIntervalSeconds: number;
+}
+
+interface DiskStatus {
+  total: string;
+  used: string;
+  free: string;
+  usedPercentage: number;
+  status: 'ok' | 'warning' | 'critical';
+}
+
 export default function SettingsPage() {
   const [serviceStatus, setServiceStatus] = useState<ServiceStatus | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [checking, setChecking] = useState(false);
-
-  const [settings, setSettings] = useState({
-    // Recording Settings
-    outputDirectory: "./recordings",
-    defaultQuality: "best",
-    autoRecordEnabled: true,
-    
-    // Monitoring Settings
-    checkInterval: "60",
-    
-    // Storage Settings
-    autoCleanup: false,
-    maxStorageGB: "100",
-    
-    // Notification Settings (placeholder)
-    discordWebhook: "",
-    notificationsEnabled: false,
+  const [settings, setSettings] = useState<AppSettings>({
+    minFreeDiskMb: 5000,
+    maxRecordingSizeMb: 0,
+    maxTotalRecordingsMb: 0,
+    maxRecordingDurationHours: 0,
+    checkIntervalSeconds: 60,
   });
+  const [diskStatus, setDiskStatus] = useState<DiskStatus | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [checking, setChecking] = useState(false);
 
   useEffect(() => {
     fetchServiceStatus();
+    fetchSettings();
     // Refresh status every 5 seconds
-    const interval = setInterval(fetchServiceStatus, 5000);
+    const interval = setInterval(() => {
+      fetchServiceStatus();
+    }, 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -93,6 +106,20 @@ export default function SettingsPage() {
       }
     } catch (error) {
       console.error("Failed to fetch service status:", error);
+    }
+  };
+
+  const fetchSettings = async () => {
+    try {
+      const response = await fetch("/api/settings");
+      if (response.ok) {
+        const data = await response.json();
+        setSettings(data.settings);
+        setDiskStatus(data.diskStatus);
+      }
+    } catch (error) {
+      console.error("Failed to fetch settings:", error);
+      toast.error("Failed to load settings");
     } finally {
       setLoading(false);
     }
@@ -106,7 +133,6 @@ export default function SettingsPage() {
       });
       if (response.ok) {
         toast.success("Manual check triggered - checking for live streamers...");
-        // Refresh status after a short delay
         setTimeout(fetchServiceStatus, 2000);
       } else {
         toast.error("Failed to trigger manual check");
@@ -118,12 +144,58 @@ export default function SettingsPage() {
     }
   };
 
-  const handleSave = () => {
-    // In a real implementation, these would be saved to a config file or database
-    toast.success("Settings saved successfully");
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const response = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(settings),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setSettings(data.settings);
+        toast.success("Settings saved successfully");
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Failed to save settings");
+      }
+    } catch (error) {
+      toast.error("Failed to save settings");
+    } finally {
+      setSaving(false);
+    }
   };
 
+  const getDiskStatusColor = (status: string) => {
+    switch (status) {
+      case 'ok': return 'text-green-500';
+      case 'warning': return 'text-yellow-500';
+      case 'critical': return 'text-red-500';
+      default: return 'text-gray-500';
+    }
+  };
 
+  const getDiskStatusBg = (status: string) => {
+    switch (status) {
+      case 'ok': return 'bg-green-500/10 border-green-500/20';
+      case 'warning': return 'bg-yellow-500/10 border-yellow-500/20';
+      case 'critical': return 'bg-red-500/10 border-red-500/20';
+      default: return 'bg-gray-500/10 border-gray-500/20';
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex h-screen bg-background">
+        <Sidebar />
+        <main className="flex-1 overflow-auto flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-background">
@@ -138,8 +210,12 @@ export default function SettingsPage() {
                 Configure your Twitch recorder preferences
               </p>
             </div>
-            <Button onClick={handleSave} className="cursor-pointer">
-              <Save className="w-4 h-4 mr-2" />
+            <Button onClick={handleSave} disabled={saving} className="cursor-pointer">
+              {saving ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="w-4 h-4 mr-2" />
+              )}
               Save Settings
             </Button>
           </div>
@@ -222,87 +298,141 @@ export default function SettingsPage() {
                       </>
                     )}
                   </Button>
-
-
                 </CardContent>
               </Card>
 
-              {/* Recording Settings */}
+              {/* Disk Space & Recording Limits */}
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2">
-                    <FolderOpen className="w-5 h-5 text-blue-500" />
-                    Recording Settings
+                    <HardDrive className="w-5 h-5 text-blue-500" />
+                    Disk Space & Recording Limits
                   </CardTitle>
                   <CardDescription>
-                    Configure default recording behavior and output settings
+                    Configure disk space requirements and recording limits to prevent system crashes
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-5">
+                  {/* Disk Status */}
+                  {diskStatus && (
+                    <div className={`p-4 rounded-lg border ${getDiskStatusBg(diskStatus.status)}`}>
+                      <div className="flex items-center gap-2 mb-3">
+                        {diskStatus.status === 'ok' ? (
+                          <CheckCircle className={`w-5 h-5 ${getDiskStatusColor(diskStatus.status)}`} />
+                        ) : (
+                          <AlertTriangle className={`w-5 h-5 ${getDiskStatusColor(diskStatus.status)}`} />
+                        )}
+                        <span className="font-medium">Disk Status: {diskStatus.status.toUpperCase()}</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-4 text-sm">
+                        <div>
+                          <p className="text-muted-foreground">Total</p>
+                          <p className="font-medium">{diskStatus.total}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Used</p>
+                          <p className="font-medium">{diskStatus.used} ({diskStatus.usedPercentage}%)</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Free</p>
+                          <p className="font-medium">{diskStatus.free}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <Separator />
+
+                  {/* Min Free Disk Space */}
                   <div className="space-y-2">
-                    <Label htmlFor="outputDirectory">Output Directory</Label>
-                    <div className="flex gap-2">
+                    <Label htmlFor="minFreeDiskMb">Minimum Free Disk Space (MB)</Label>
+                    <div className="flex items-center gap-3">
                       <Input
-                        id="outputDirectory"
-                        value={settings.outputDirectory}
+                        id="minFreeDiskMb"
+                        type="number"
+                        min="0"
+                        value={settings.minFreeDiskMb}
                         onChange={(e) =>
-                          setSettings({ ...settings, outputDirectory: e.target.value })
+                          setSettings({ ...settings, minFreeDiskMb: parseInt(e.target.value) || 0 })
                         }
-                        placeholder="./recordings"
+                        className="max-w-[150px]"
                       />
-                      <Button variant="outline" size="icon" className="cursor-pointer shrink-0">
-                        <FolderOpen className="w-4 h-4" />
-                      </Button>
+                      <span className="text-sm text-muted-foreground">
+                        ~{(settings.minFreeDiskMb / 1024).toFixed(1)} GB
+                      </span>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Where recorded streams will be saved
+                      Recordings will not start if free space falls below this limit (0 = no limit)
                     </p>
                   </div>
 
+                  {/* Max Recording Size */}
                   <div className="space-y-2">
-                    <Label htmlFor="defaultQuality">Default Quality</Label>
-                    <Select
-                      value={settings.defaultQuality}
-                      onValueChange={(value) =>
-                        setSettings({ ...settings, defaultQuality: value })
-                      }
-                    >
-                      <SelectTrigger id="defaultQuality" className="cursor-pointer">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="best">Best</SelectItem>
-                        <SelectItem value="1080p60">1080p60</SelectItem>
-                        <SelectItem value="1080p">1080p</SelectItem>
-                        <SelectItem value="720p60">720p60</SelectItem>
-                        <SelectItem value="720p">720p</SelectItem>
-                        <SelectItem value="480p">480p</SelectItem>
-                        <SelectItem value="360p">360p</SelectItem>
-                        <SelectItem value="worst">Worst</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="maxRecordingSizeMb">Max Recording Size (MB)</Label>
+                    <div className="flex items-center gap-3">
+                      <Input
+                        id="maxRecordingSizeMb"
+                        type="number"
+                        min="0"
+                        value={settings.maxRecordingSizeMb}
+                        onChange={(e) =>
+                          setSettings({ ...settings, maxRecordingSizeMb: parseInt(e.target.value) || 0 })
+                        }
+                        className="max-w-[150px]"
+                      />
+                      <span className="text-sm text-muted-foreground">
+                        {settings.maxRecordingSizeMb === 0 ? 'Unlimited' : `~${(settings.maxRecordingSizeMb / 1024).toFixed(1)} GB`}
+                      </span>
+                    </div>
                     <p className="text-xs text-muted-foreground">
-                      Default quality for new streamers
+                      Individual recordings will stop when they reach this size (0 = unlimited)
                     </p>
                   </div>
 
-                  <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50 border">
-                    <div>
-                      <Label htmlFor="autoRecord" className="cursor-pointer font-medium">
-                        Auto-record when live
-                      </Label>
-                      <p className="text-sm text-muted-foreground">
-                        Automatically start recording when monitored streamers go live
-                      </p>
+                  {/* Max Total Recordings */}
+                  <div className="space-y-2">
+                    <Label htmlFor="maxTotalRecordingsMb">Max Total Recordings (MB)</Label>
+                    <div className="flex items-center gap-3">
+                      <Input
+                        id="maxTotalRecordingsMb"
+                        type="number"
+                        min="0"
+                        value={settings.maxTotalRecordingsMb}
+                        onChange={(e) =>
+                          setSettings({ ...settings, maxTotalRecordingsMb: parseInt(e.target.value) || 0 })
+                        }
+                        className="max-w-[150px]"
+                      />
+                      <span className="text-sm text-muted-foreground">
+                        {settings.maxTotalRecordingsMb === 0 ? 'Unlimited' : `~${(settings.maxTotalRecordingsMb / 1024).toFixed(1)} GB`}
+                      </span>
                     </div>
-                    <Switch
-                      id="autoRecord"
-                      checked={settings.autoRecordEnabled}
-                      onCheckedChange={(checked) =>
-                        setSettings({ ...settings, autoRecordEnabled: checked })
-                      }
-                      className="cursor-pointer"
-                    />
+                    <p className="text-xs text-muted-foreground">
+                      New recordings will not start if total size exceeds this limit (0 = unlimited)
+                    </p>
+                  </div>
+
+                  {/* Max Recording Duration */}
+                  <div className="space-y-2">
+                    <Label htmlFor="maxRecordingDurationHours">Max Recording Duration (hours)</Label>
+                    <div className="flex items-center gap-3">
+                      <Input
+                        id="maxRecordingDurationHours"
+                        type="number"
+                        min="0"
+                        value={settings.maxRecordingDurationHours}
+                        onChange={(e) =>
+                          setSettings({ ...settings, maxRecordingDurationHours: parseInt(e.target.value) || 0 })
+                        }
+                        className="max-w-[150px]"
+                      />
+                      <span className="text-sm text-muted-foreground">
+                        {settings.maxRecordingDurationHours === 0 ? 'Unlimited' : `${settings.maxRecordingDurationHours} hours`}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Recordings will stop automatically after this duration (0 = unlimited)
+                    </p>
                   </div>
                 </CardContent>
               </Card>
@@ -353,16 +483,16 @@ export default function SettingsPage() {
                 </CardHeader>
                 <CardContent className="space-y-5">
                   <div className="space-y-2">
-                    <Label htmlFor="checkInterval">Check Interval (seconds)</Label>
+                    <Label htmlFor="checkIntervalSeconds">Check Interval (seconds)</Label>
                     <div className="flex items-center gap-3">
                       <Input
-                        id="checkInterval"
+                        id="checkIntervalSeconds"
                         type="number"
                         min="30"
-                        max="600"
-                        value={settings.checkInterval}
+                        max="3600"
+                        value={settings.checkIntervalSeconds}
                         onChange={(e) =>
-                          setSettings({ ...settings, checkInterval: e.target.value })
+                          setSettings({ ...settings, checkIntervalSeconds: parseInt(e.target.value) || 60 })
                         }
                         className="max-w-[150px]"
                       />
@@ -372,58 +502,39 @@ export default function SettingsPage() {
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      How often to check if streamers are live (30-600 seconds)
+                      How often to check if streamers are live (30-3600 seconds)
                     </p>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Storage Management */}
+              {/* Recording Settings */}
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2">
-                    <Database className="w-5 h-5 text-orange-500" />
-                    Storage Management
+                    <FolderOpen className="w-5 h-5 text-blue-500" />
+                    Recording Settings
                   </CardTitle>
                   <CardDescription>
-                    Configure automatic cleanup and storage limits
+                    Configure output directory and quality settings
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-5">
-                  <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50 border">
-                    <div>
-                      <Label htmlFor="autoCleanup" className="cursor-pointer font-medium">
-                        Automatic Cleanup
-                      </Label>
-                      <p className="text-sm text-muted-foreground">
-                        Automatically delete old recordings when storage limit is reached
-                      </p>
-                    </div>
-                    <Switch
-                      id="autoCleanup"
-                      checked={settings.autoCleanup}
-                      onCheckedChange={(checked) =>
-                        setSettings({ ...settings, autoCleanup: checked })
-                      }
-                      className="cursor-pointer"
-                    />
-                  </div>
-
                   <div className="space-y-2">
-                    <Label htmlFor="maxStorage">Maximum Storage (GB)</Label>
-                    <Input
-                      id="maxStorage"
-                      type="number"
-                      min="1"
-                      value={settings.maxStorageGB}
-                      onChange={(e) =>
-                        setSettings({ ...settings, maxStorageGB: e.target.value })
-                      }
-                      disabled={!settings.autoCleanup}
-                      className="max-w-[150px]"
-                    />
+                    <Label htmlFor="outputDirectory">Output Directory</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="outputDirectory"
+                        value="./recordings"
+                        disabled
+                        className="bg-muted"
+                      />
+                      <Button variant="outline" size="icon" className="cursor-pointer shrink-0" disabled>
+                        <FolderOpen className="w-4 h-4" />
+                      </Button>
+                    </div>
                     <p className="text-xs text-muted-foreground">
-                      Maximum storage space to use for recordings
+                      Recordings are saved to the ./recordings directory (configured via RECORDINGS_DIR env var)
                     </p>
                   </div>
                 </CardContent>
@@ -452,30 +563,14 @@ export default function SettingsPage() {
                     </div>
                     <Switch
                       id="notificationsEnabled"
-                      checked={settings.notificationsEnabled}
-                      onCheckedChange={(checked) =>
-                        setSettings({ ...settings, notificationsEnabled: checked })
-                      }
-                      className="cursor-pointer"
+                      checked={false}
+                      disabled
+                      className="cursor-not-allowed"
                     />
                   </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="discordWebhook">Discord Webhook URL</Label>
-                    <Input
-                      id="discordWebhook"
-                      type="url"
-                      placeholder="https://discord.com/api/webhooks/..."
-                      value={settings.discordWebhook}
-                      onChange={(e) =>
-                        setSettings({ ...settings, discordWebhook: e.target.value })
-                      }
-                      disabled={!settings.notificationsEnabled}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Discord webhook URL for notifications
-                    </p>
-                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Notification settings coming soon
+                  </p>
                 </CardContent>
               </Card>
 

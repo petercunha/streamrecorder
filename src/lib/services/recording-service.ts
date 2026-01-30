@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { RecordingModel, RecordingLogModel, StreamerModel, StatsModel } from '../models';
 import { EventEmitter } from 'events';
+import { checkDiskSpaceForRecording, getDiskSpaceStatus, getMaxRecordingSizeMb, getMaxRecordingDurationMs } from '../utils/disk-space';
 
 const RECORDINGS_DIR = process.env.RECORDINGS_DIR || path.join(process.cwd(), 'recordings');
 
@@ -13,6 +14,8 @@ interface ActiveRecording {
   username: string;
   startTime: Date;
   filePath: string;
+  fileSizeCheckInterval?: NodeJS.Timeout;
+  durationCheckInterval?: NodeJS.Timeout;
 }
 
 export class RecordingService extends EventEmitter {
@@ -20,6 +23,7 @@ export class RecordingService extends EventEmitter {
   private checkInterval: NodeJS.Timeout | null = null;
   private isShuttingDown = false;
   private checkInProgress = false;
+  private shutdownPromise: Promise<void> | null = null;
 
   constructor() {
     super();
@@ -31,9 +35,23 @@ export class RecordingService extends EventEmitter {
 
   // Graceful shutdown - stop all active recordings
   async shutdown(): Promise<void> {
+    // If already shutting down, return the existing promise
+    if (this.shutdownPromise) {
+      return this.shutdownPromise;
+    }
+
+    // If already shut down, return immediately
     if (this.isShuttingDown) {
       return;
     }
+
+    // Create the shutdown promise
+    this.shutdownPromise = this.performShutdown();
+    return this.shutdownPromise;
+  }
+
+  // Internal shutdown implementation
+  private async performShutdown(): Promise<void> {
     this.isShuttingDown = true;
     
     console.log('Shutting down recording service...');
@@ -82,10 +100,21 @@ export class RecordingService extends EventEmitter {
       // Update stats
       StatsModel.update({ active_recordings: 0 });
       
+      // Clear all intervals first to prevent checks during shutdown
+      for (const recording of activeRecordings) {
+        if (recording.fileSizeCheckInterval) {
+          clearInterval(recording.fileSizeCheckInterval);
+        }
+        if (recording.durationCheckInterval) {
+          clearInterval(recording.durationCheckInterval);
+        }
+      }
+      
       // Remove all from map BEFORE killing processes to prevent handleRecordingEnd from running
       // This prevents the handleRecordingEnd callback from updating the DB again
       const recordingsToStop = [...activeRecordings];
       this.activeRecordings.clear();
+      
       // Now kill the processes
       const stopPromises = recordingsToStop.map(recording => {
         return new Promise<void>((resolve) => {
@@ -116,6 +145,11 @@ export class RecordingService extends EventEmitter {
 
   // Start the auto-recording checker
   startAutoChecker(intervalMs: number = 60000): void {
+    if (this.isShuttingDown) {
+      console.log('Cannot start auto checker: service is shutting down');
+      return;
+    }
+
     if (this.checkInterval) {
       clearInterval(this.checkInterval);
     }
@@ -141,6 +175,12 @@ export class RecordingService extends EventEmitter {
     // Prevent concurrent checks
     if (this.checkInProgress) {
       console.log('Check already in progress, skipping...');
+      return;
+    }
+
+    // Don't start new recordings during shutdown
+    if (this.isShuttingDown) {
+      console.log('Service is shutting down, skipping check...');
       return;
     }
     
@@ -172,6 +212,18 @@ export class RecordingService extends EventEmitter {
           // Final check before starting to prevent race conditions
           if (this.isRecording(streamer.id)) {
             console.log(`Recording for ${streamer.username} started by another check, skipping...`);
+            continue;
+          }
+          
+          // Check disk space before starting
+          const diskCheck = checkDiskSpaceForRecording(RECORDINGS_DIR);
+          if (!diskCheck.allowed) {
+            console.error(`Cannot start recording for ${streamer.username}: ${diskCheck.reason}`);
+            RecordingLogModel.create({
+              streamer_username: streamer.username,
+              message: `Recording blocked: ${diskCheck.reason}`,
+              level: 'error',
+            });
             continue;
           }
           
@@ -271,6 +323,11 @@ export class RecordingService extends EventEmitter {
 
   // Start recording a streamer
   async startRecording(streamerId: number): Promise<number> {
+    // Don't start new recordings during shutdown
+    if (this.isShuttingDown) {
+      throw new Error('Cannot start recording: service is shutting down');
+    }
+
     const streamer = StreamerModel.findById(streamerId);
     if (!streamer) {
       throw new Error('Streamer not found');
@@ -279,6 +336,17 @@ export class RecordingService extends EventEmitter {
     // Check if already recording
     if (this.isRecording(streamerId)) {
       throw new Error('Already recording this streamer');
+    }
+
+    // Check disk space before starting
+    const diskCheck = checkDiskSpaceForRecording(RECORDINGS_DIR);
+    if (!diskCheck.allowed) {
+      RecordingLogModel.create({
+        streamer_username: streamer.username,
+        message: `Recording blocked: ${diskCheck.reason}`,
+        level: 'error',
+      });
+      throw new Error(`Cannot start recording: ${diskCheck.reason}`);
     }
 
     // Get stream metadata before starting
@@ -323,6 +391,22 @@ export class RecordingService extends EventEmitter {
     
     // Update stats in database to reflect the actual in-memory active recordings count
     StatsModel.update({ active_recordings: this.activeRecordings.size });
+
+    // Set up file size monitoring if limit is configured
+    const maxRecordingSizeMb = getMaxRecordingSizeMb();
+    if (maxRecordingSizeMb > 0) {
+      activeRecording.fileSizeCheckInterval = setInterval(() => {
+        this.checkRecordingFileSize(streamerId);
+      }, 30000); // Check every 30 seconds
+    }
+
+    // Set up duration monitoring if limit is configured
+    const maxRecordingDurationMs = getMaxRecordingDurationMs();
+    if (maxRecordingDurationMs > 0) {
+      activeRecording.durationCheckInterval = setInterval(() => {
+        this.checkRecordingDuration(streamerId);
+      }, 60000); // Check every minute
+    }
 
     // Handle process events
     streamlink.on('close', (code) => {
@@ -373,9 +457,63 @@ export class RecordingService extends EventEmitter {
       level: 'success',
     });
 
+    // Log disk space info
+    const diskStatus = getDiskSpaceStatus(RECORDINGS_DIR);
+    RecordingLogModel.create({
+      recording_id: recording.id,
+      streamer_username: streamer.username,
+      message: `Disk space: ${diskStatus.free} free (${diskStatus.usedPercentage}% used)`,
+      level: diskStatus.status === 'ok' ? 'info' : diskStatus.status === 'warning' ? 'warn' : 'error',
+    });
+
     this.emit('recordingStarted', { recordingId: recording.id, streamerId, username: streamer.username });
 
     return recording.id;
+  }
+
+  // Check if recording file size exceeds limit
+  private checkRecordingFileSize(streamerId: number): void {
+    const maxRecordingSizeMb = getMaxRecordingSizeMb();
+    const recording = this.activeRecordings.get(streamerId);
+    if (!recording || maxRecordingSizeMb <= 0) return;
+
+    try {
+      const stats = fs.statSync(recording.filePath);
+      const fileSizeMb = stats.size / (1024 * 1024);
+
+      if (fileSizeMb >= maxRecordingSizeMb) {
+        console.log(`Recording ${recording.recordingId} exceeded max size (${fileSizeMb.toFixed(0)}MB >= ${maxRecordingSizeMb}MB), stopping...`);
+        RecordingLogModel.create({
+          recording_id: recording.recordingId,
+          streamer_username: recording.username,
+          message: `Recording stopped: exceeded maximum file size limit (${maxRecordingSizeMb}MB)`,
+          level: 'warn',
+        });
+        this.stopRecording(streamerId);
+      }
+    } catch (error) {
+      // File might not exist yet
+    }
+  }
+
+  // Check if recording duration exceeds limit
+  private checkRecordingDuration(streamerId: number): void {
+    const maxRecordingDurationMs = getMaxRecordingDurationMs();
+    const recording = this.activeRecordings.get(streamerId);
+    if (!recording || maxRecordingDurationMs <= 0) return;
+
+    const durationMs = Date.now() - recording.startTime.getTime();
+    if (durationMs >= maxRecordingDurationMs) {
+      const hours = (maxRecordingDurationMs / (60 * 60 * 1000)).toFixed(1);
+      console.log(`Recording ${recording.recordingId} exceeded max duration (${hours}h), stopping...`);
+      RecordingLogModel.create({
+        recording_id: recording.recordingId,
+        streamer_username: recording.username,
+        message: `Recording stopped: exceeded maximum duration limit (${hours} hours)`,
+        level: 'warn',
+      });
+      this.stopRecording(streamerId);
+    }
   }
 
   // Stop a recording
@@ -383,6 +521,14 @@ export class RecordingService extends EventEmitter {
     const recording = this.activeRecordings.get(streamerId);
     if (!recording) {
       return false;
+    }
+
+    // Clear monitoring intervals
+    if (recording.fileSizeCheckInterval) {
+      clearInterval(recording.fileSizeCheckInterval);
+    }
+    if (recording.durationCheckInterval) {
+      clearInterval(recording.durationCheckInterval);
     }
 
     recording.process.kill('SIGTERM');
@@ -399,8 +545,21 @@ export class RecordingService extends EventEmitter {
 
   // Handle recording end
   private async handleRecordingEnd(streamerId: number, exitCode: number | null): Promise<void> {
+    // Don't process recording end if we're shutting down (shutdown already handled everything)
+    if (this.isShuttingDown) {
+      return;
+    }
+
     const recording = this.activeRecordings.get(streamerId);
     if (!recording) return;
+
+    // Clear monitoring intervals
+    if (recording.fileSizeCheckInterval) {
+      clearInterval(recording.fileSizeCheckInterval);
+    }
+    if (recording.durationCheckInterval) {
+      clearInterval(recording.durationCheckInterval);
+    }
 
     this.activeRecordings.delete(streamerId);
     
@@ -484,11 +643,17 @@ export class RecordingService extends EventEmitter {
     return `~${estimatedSpeed} MB/s`;
   }
 
+  // Get disk space status
+  getDiskSpaceStatus() {
+    return getDiskSpaceStatus(RECORDINGS_DIR);
+  }
+
   // Reset method for tests - clears all internal state
   reset(): void {
     this.activeRecordings.clear();
     this.checkInProgress = false;
     this.isShuttingDown = false;
+    this.shutdownPromise = null;
     if (this.checkInterval) {
       clearInterval(this.checkInterval);
       this.checkInterval = null;

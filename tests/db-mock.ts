@@ -77,6 +77,21 @@ export function getTestDb(): DatabaseType {
     `);
 
     testDb.exec(`INSERT OR IGNORE INTO service_state (id, is_running) VALUES (1, 0)`);
+
+    // Settings table
+    testDb.exec(`
+      CREATE TABLE IF NOT EXISTS settings (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        min_free_disk_mb INTEGER DEFAULT 5000,
+        max_recording_size_mb INTEGER DEFAULT 0,
+        max_total_recordings_mb INTEGER DEFAULT 0,
+        max_recording_duration_hours INTEGER DEFAULT 0,
+        check_interval_seconds INTEGER DEFAULT 60,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    testDb.exec(`INSERT OR IGNORE INTO settings (id) VALUES (1)`);
   }
   return testDb;
 }
@@ -91,7 +106,7 @@ export function resetTestDb(): DatabaseType {
 
 export function clearTestDb(): void {
   const db = getTestDb();
-  const tables = ['recording_logs', 'recordings', 'streamers', 'stats', 'service_state'];
+  const tables = ['recording_logs', 'recordings', 'streamers', 'stats', 'service_state', 'settings'];
   for (const table of tables) {
     try {
       db.exec(`DELETE FROM ${table}`);
@@ -101,4 +116,5 @@ export function clearTestDb(): void {
   }
   db.exec(`INSERT OR IGNORE INTO stats (id) VALUES (1)`);
   db.exec(`INSERT OR IGNORE INTO service_state (id, is_running) VALUES (1, 0)`);
+  db.exec(`INSERT OR IGNORE INTO settings (id) VALUES (1)`);
 }

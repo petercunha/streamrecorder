@@ -111,6 +111,24 @@ export function initDatabase() {
     INSERT OR IGNORE INTO service_state (id, is_running) VALUES (1, 0)
   `);
 
+  // Settings table for application configuration
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS settings (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      min_free_disk_mb INTEGER DEFAULT 5000,
+      max_recording_size_mb INTEGER DEFAULT 0,
+      max_total_recordings_mb INTEGER DEFAULT 0,
+      max_recording_duration_hours INTEGER DEFAULT 0,
+      check_interval_seconds INTEGER DEFAULT 60,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // Insert default settings if not exists
+  db.exec(`
+    INSERT OR IGNORE INTO settings (id) VALUES (1)
+  `);
+
   isInitialized = true;
   console.log('Database initialized at:', DB_PATH);
 }

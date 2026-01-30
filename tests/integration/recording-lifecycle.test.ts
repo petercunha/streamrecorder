@@ -20,7 +20,24 @@ vi.mock('fs', () => ({
     existsSync: vi.fn(() => true),
     mkdirSync: vi.fn(),
     statSync: vi.fn(() => ({ size: 1024 * 1024 * 10 })),
+    statfsSync: vi.fn(() => ({
+      bsize: 4096,
+      blocks: 10000000,
+      bavail: 8000000,
+      bfree: 8500000,
+    })),
+    readdirSync: vi.fn(() => []),
   },
+}));
+
+// Mock disk-space module
+vi.mock('@/lib/utils/disk-space', () => ({
+  checkDiskSpaceForRecording: vi.fn(() => ({ allowed: true, freeSpaceMb: 10000, usedPercentage: 50 })),
+  getDiskSpaceStatus: vi.fn(() => ({ total: '100 GB', used: '50 GB', free: '50 GB', usedPercentage: 50, status: 'ok' as const })),
+  getTotalRecordingsSizeMb: vi.fn(() => 0),
+  formatBytes: vi.fn((bytes: number) => `${bytes} B`),
+  getMaxRecordingSizeMb: vi.fn(() => 0),
+  getMaxRecordingDurationMs: vi.fn(() => 0),
 }));
 
 // Track active mock processes for cleanup

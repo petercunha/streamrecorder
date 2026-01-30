@@ -6,6 +6,17 @@ import { StreamerModel } from '@/lib/models/streamer';
 import { RecordingModel } from '@/lib/models/recording';
 import { RecordingLogModel } from '@/lib/models/recording-log';
 import { StatsModel } from '@/lib/models/stats';
+import * as diskSpace from '@/lib/utils/disk-space';
+
+// Mock disk-space module
+vi.mock('@/lib/utils/disk-space', () => ({
+  checkDiskSpaceForRecording: vi.fn(() => ({ allowed: true, freeSpaceMb: 10000, usedPercentage: 50 })),
+  getDiskSpaceStatus: vi.fn(() => ({ total: '100 GB', used: '50 GB', free: '50 GB', usedPercentage: 50, status: 'ok' as const })),
+  getTotalRecordingsSizeMb: vi.fn(() => 0),
+  formatBytes: vi.fn((bytes: number) => `${bytes} B`),
+  getMaxRecordingSizeMb: vi.fn(() => 0),
+  getMaxRecordingDurationMs: vi.fn(() => 0),
+}));
 
 // Mock child_process
 let mockSpawnImplementation: ReturnType<typeof vi.fn>;
@@ -20,6 +31,13 @@ vi.mock('fs', () => ({
     existsSync: vi.fn(() => true),
     mkdirSync: vi.fn(),
     statSync: vi.fn(() => ({ size: 1024 * 1024 })),
+    statfsSync: vi.fn(() => ({
+      bsize: 4096,
+      blocks: 10000000,
+      bavail: 8000000,
+      bfree: 8500000,
+    })),
+    readdirSync: vi.fn(() => []),
   },
 }));
 
@@ -766,6 +784,150 @@ describe('RecordingService', () => {
         
         expect(service.getTotalDownloadSpeed()).toBe('~12 MB/s');
       });
+    });
+
+    describe('getDiskSpaceStatus', () => {
+      it('should return disk space status', () => {
+        const status = service.getDiskSpaceStatus();
+        
+        expect(status).toMatchObject({
+          total: expect.any(String),
+          used: expect.any(String),
+          free: expect.any(String),
+          usedPercentage: expect.any(Number),
+          status: expect.any(String),
+        });
+      });
+    });
+  });
+
+  describe('Disk Space Checks', () => {
+    it('should block recording when disk space is insufficient', async () => {
+      const mockedDiskSpace = vi.mocked(diskSpace);
+      mockedDiskSpace.checkDiskSpaceForRecording.mockReturnValueOnce({
+        allowed: false,
+        reason: 'Insufficient disk space',
+        freeSpaceMb: 100,
+        usedPercentage: 95,
+      });
+
+      const streamer = StreamerModel.create({ username: 'testuser' });
+
+      await expect(service.startRecording(streamer.id)).rejects.toThrow('Insufficient disk space');
+    });
+
+    it('should log disk space warning when recording starts', async () => {
+      mockSpawnImplementation = vi.fn((command: string, args: string[]) => {
+        const isMetadataCheck = args.includes('--json');
+        return createMockProcess({ isLive: true, delayMs: 10, longRunning: !isMetadataCheck });
+      });
+
+      const streamer = StreamerModel.create({ username: 'testuser' });
+      const recordingId = await service.startRecording(streamer.id);
+
+      // Check that disk space log was created
+      const logs = RecordingLogModel.findAll({ recordingId });
+      expect(logs.some(l => l.message.includes('Disk space:'))).toBe(true);
+    });
+
+    it('should skip auto-recording when disk space is insufficient', async () => {
+      const mockedDiskSpace = vi.mocked(diskSpace);
+      mockedDiskSpace.checkDiskSpaceForRecording.mockReturnValueOnce({
+        allowed: false,
+        reason: 'Insufficient disk space',
+        freeSpaceMb: 100,
+        usedPercentage: 95,
+      });
+
+      mockSpawnImplementation = vi.fn(() => createMockProcess({ isLive: true }));
+
+      StreamerModel.create({ username: 'testuser' });
+
+      await service.checkAndRecordStreamers();
+
+      // Should not have started recording due to disk space check
+      expect(service.getActiveCount()).toBe(0);
+    });
+  });
+
+  describe('Shutdown Race Condition', () => {
+    it('should prevent handleRecordingEnd from running after shutdown starts', async () => {
+      mockSpawnImplementation = vi.fn((command: string, args: string[]) => {
+        const isMetadataCheck = args.includes('--json');
+        return createMockProcess({ isLive: true, delayMs: 10, longRunning: !isMetadataCheck });
+      });
+
+      const streamer = StreamerModel.create({ username: 'testuser' });
+      const recordingId = await service.startRecording(streamer.id);
+
+      // Start shutdown (this should clear the active recordings map)
+      const shutdownPromise = service.shutdown();
+
+      // Immediately after shutdown starts, check that the recording is being handled
+      expect(service.getActiveCount()).toBe(0);
+
+      await shutdownPromise;
+
+      // Verify recording status in DB
+      const recording = RecordingModel.findById(recordingId);
+      expect(recording?.status).toBe('completed');
+    });
+
+    it('should handle concurrent shutdown calls', async () => {
+      mockSpawnImplementation = vi.fn((command: string, args: string[]) => {
+        const isMetadataCheck = args.includes('--json');
+        return createMockProcess({ isLive: true, delayMs: 10, longRunning: !isMetadataCheck });
+      });
+
+      const streamer1 = StreamerModel.create({ username: 'user1' });
+      const streamer2 = StreamerModel.create({ username: 'user2' });
+
+      await service.startRecording(streamer1.id);
+      await service.startRecording(streamer2.id);
+
+      // Call shutdown multiple times concurrently
+      const [result1, result2, result3] = await Promise.all([
+        service.shutdown(),
+        service.shutdown(),
+        service.shutdown(),
+      ]);
+
+      // All should resolve without error
+      expect(service.getActiveCount()).toBe(0);
+    });
+
+    it('should not start new recordings during shutdown', async () => {
+      mockSpawnImplementation = vi.fn((command: string, args: string[]) => {
+        const isMetadataCheck = args.includes('--json');
+        return createMockProcess({ isLive: true, delayMs: 10, longRunning: !isMetadataCheck });
+      });
+
+      const streamer = StreamerModel.create({ username: 'testuser' });
+
+      // Start shutdown
+      const shutdownPromise = service.shutdown();
+
+      // Try to start recording during shutdown
+      await expect(service.startRecording(streamer.id)).rejects.toThrow('service is shutting down');
+
+      await shutdownPromise;
+    });
+
+    it('should not check for streamers during shutdown', async () => {
+      mockSpawnImplementation = vi.fn(() => createMockProcess({ isLive: true }));
+
+      StreamerModel.create({ username: 'testuser' });
+
+      // Start shutdown
+      const shutdownPromise = service.shutdown();
+
+      // Try to check for streamers during shutdown
+      await service.checkAndRecordStreamers(); // Should return early without error
+
+      await shutdownPromise;
+
+      // No recordings should have started
+      expect(service.getActiveCount()).toBe(0);
     });
   });
 });
