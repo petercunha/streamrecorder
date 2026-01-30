@@ -392,13 +392,10 @@ export class RecordingService extends EventEmitter {
     // Update stats in database to reflect the actual in-memory active recordings count
     StatsModel.update({ active_recordings: this.activeRecordings.size });
 
-    // Set up file size monitoring if limit is configured
-    const maxRecordingSizeMb = getMaxRecordingSizeMb();
-    if (maxRecordingSizeMb > 0) {
-      activeRecording.fileSizeCheckInterval = setInterval(() => {
-        this.checkRecordingFileSize(streamerId);
-      }, 30000); // Check every 30 seconds
-    }
+    // Set up file size monitoring to update database and check limits
+    activeRecording.fileSizeCheckInterval = setInterval(() => {
+      this.updateRecordingFileSize(streamerId);
+    }, 5000); // Update every 5 seconds
 
     // Set up duration monitoring if limit is configured
     const maxRecordingDurationMs = getMaxRecordingDurationMs();
@@ -471,17 +468,24 @@ export class RecordingService extends EventEmitter {
     return recording.id;
   }
 
-  // Check if recording file size exceeds limit
-  private checkRecordingFileSize(streamerId: number): void {
-    const maxRecordingSizeMb = getMaxRecordingSizeMb();
+  // Update recording file size in database and check limits
+  private updateRecordingFileSize(streamerId: number): void {
     const recording = this.activeRecordings.get(streamerId);
-    if (!recording || maxRecordingSizeMb <= 0) return;
+    if (!recording) return;
 
     try {
       const stats = fs.statSync(recording.filePath);
-      const fileSizeMb = stats.size / (1024 * 1024);
+      const fileSizeBytes = stats.size;
+      const fileSizeMb = fileSizeBytes / (1024 * 1024);
 
-      if (fileSizeMb >= maxRecordingSizeMb) {
+      // Always update the database with current file size
+      RecordingModel.update(recording.recordingId, {
+        file_size_bytes: fileSizeBytes,
+      });
+
+      // Check if size limit is exceeded
+      const maxRecordingSizeMb = getMaxRecordingSizeMb();
+      if (maxRecordingSizeMb > 0 && fileSizeMb >= maxRecordingSizeMb) {
         console.log(`Recording ${recording.recordingId} exceeded max size (${fileSizeMb.toFixed(0)}MB >= ${maxRecordingSizeMb}MB), stopping...`);
         RecordingLogModel.create({
           recording_id: recording.recordingId,
@@ -646,6 +650,20 @@ export class RecordingService extends EventEmitter {
   // Get disk space status
   getDiskSpaceStatus() {
     return getDiskSpaceStatus(RECORDINGS_DIR);
+  }
+
+  // Get current file size for an active recording (real-time)
+  getRecordingFileSize(streamerId: number): number {
+    const recording = this.activeRecordings.get(streamerId);
+    if (!recording) return 0;
+
+    try {
+      const stats = fs.statSync(recording.filePath);
+      return stats.size;
+    } catch (error) {
+      // File might not exist yet
+      return 0;
+    }
   }
 
   // Reset method for tests - clears all internal state

@@ -8,7 +8,7 @@ export async function GET() {
     initDatabase();
     
     // Get active recordings from the database
-    // (in-memory Map may not be accessible from API routes in Next.js dev mode)
+    // File size is updated every 5 seconds by the recording service
     const activeRecordings = RecordingModel.findAll({ status: 'recording' });
     
     return NextResponse.json(activeRecordings);
