@@ -15,7 +15,7 @@ interface ActiveRecording {
   filePath: string;
 }
 
-class RecordingService extends EventEmitter {
+export class RecordingService extends EventEmitter {
   private activeRecordings: Map<number, ActiveRecording> = new Map();
   private checkInterval: NodeJS.Timeout | null = null;
   private isShuttingDown = false;
@@ -479,9 +479,21 @@ class RecordingService extends EventEmitter {
     const activeCount = this.activeRecordings.size;
     if (activeCount === 0) return '0 MB/s';
     
-    // Estimate ~6 Mbps per 1080p60 stream
+    // Estimate ~6 MB/s per 1080p60 stream
     const estimatedSpeed = activeCount * 6;
     return `~${estimatedSpeed} MB/s`;
+  }
+
+  // Reset method for tests - clears all internal state
+  reset(): void {
+    this.activeRecordings.clear();
+    this.checkInProgress = false;
+    this.isShuttingDown = false;
+    if (this.checkInterval) {
+      clearInterval(this.checkInterval);
+      this.checkInterval = null;
+    }
+    this.removeAllListeners();
   }
 }
 
